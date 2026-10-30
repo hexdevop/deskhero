@@ -14,7 +14,7 @@ Godot 4.7.2, GDScript со статической типизацией, тест
 brew install --cask godot                 # установка
 godot --path . --editor                   # редактор
 godot --path .                            # запуск оверлея
-godot --headless --path . -s addons/gut/gut_cmdln.gd -gdir=res://tests -gexit   # тесты, появятся в T-002
+godot --headless --path . -s addons/gut/gut_cmdln.gd -gdir=res://tests -gexit   # тесты (GUT 9.7.1)
 ```
 
 ## Структура

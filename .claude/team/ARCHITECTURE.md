@@ -8,7 +8,7 @@
 |---|---|---|
 | Godot | 4.7.2 | `brew install --cask godot`, CLI `godot` |
 | GDScript | движка | Статическая типизация везде |
-| GUT | последняя совместимая с Godot 4.7 | В `addons/gut/`, версия фиксируется в T-002 |
+| GUT | 9.7.1 (тег v9.7.1, коммит aeb5d4f3f7f0) | В `addons/gut/`, только для тестов. Плагин не включать: он сам ходит в сеть. Флаг `-gcheck_update` запрещён. В экспорт не попадает |
 | GDExtension | этап 5 | C++ (godot-cpp) или Rust (godot-rust), выбрать на этапе 5 |
 | GitHub Actions | этап 10 | Сборка по тегу `v*` |
 
