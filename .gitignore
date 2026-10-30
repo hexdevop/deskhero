@@ -1,0 +1,15 @@
+# Godot
+.godot/
+*.import.tmp
+
+# Сборки
+build/
+export/
+
+# macOS
+.DS_Store
+
+# Claude
+.claude/settings.local.json
+.claude/messages/*
+!.claude/messages/README.md
