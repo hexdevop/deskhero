@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="OverlayConfig" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/overlay/overlay_config.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+screen_index = -1
+active_fps = 30
+idle_fps = 8
+low_processor_mode = true
+low_processor_sleep_usec = 33333
+screen_check_interval_sec = 2.0
