@@ -8,7 +8,7 @@ DeskHero — десктопный питомец: маленький ориги�
 
 ## Стек и команды
 
-Godot 4.7.2, GDScript со статической типизацией, тесты GUT, GDExtension с этапа 5. Команды для macOS, терминал **fish**.
+Godot 4.7.2, GDScript со статической типизацией, тесты GUT, минимальный GDExtension macOS с этапа 0 (D-005), полный с этапа 5. Команды для macOS, терминал **fish**.
 
 ```fish
 brew install --cask godot                 # установка
@@ -26,7 +26,7 @@ scripts/autoload/  EventBus, GameState, SaveManager, Settings, SystemProbe
 scripts/hero/      машина состояний, states/
 scripts/web/       паутина
 scripts/platform/  обёртки ОС и заглушки
-native/            GDExtension, с этапа 5
+native/            GDExtension: Spaces и Accessory, с этапа 5 окна и метрики
 assets/ tests/ tools/
 .claude/team/      SPEC, ARCHITECTURE, PLAN
 .claude/agents/    роли команды

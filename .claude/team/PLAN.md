@@ -14,7 +14,7 @@
 | T-004 | Passthrough-полигон и перетаскиваемый квадрат-плейсхолдер | FR-2 | godot-dev | T-003 | done |
 | T-005 | macOS: нет в Dock/Cmd+Tab (экспорт с `LSUIElement`), проверить Spaces и полноэкранные приложения | FR-3 | native-dev | T-004 | review |
 | T-006 | Замер CPU в покое и при перетаскивании, отставание полигона при 5–10 FPS | NFR-1 | qa-tester | T-004 | done |
-| T-007 | Решение в `docs/DECISIONS.md`: основной или запасной подход; чек-лист ручной проверки | FR-1…3 | architect | T-005, T-006 | todo |
+| T-007 | Решение в `docs/DECISIONS.md`: основной или запасной подход; чек-лист ручной проверки | FR-1…3 | architect | T-005, T-006 | review |
 
 ## Этапы 1–10
 
@@ -27,7 +27,7 @@
 | T-301 | Этап 3: `GameState`, офлайн-изменения, `SaveManager` с миграциями | FR-12, FR-13 | godot-dev | T-202 | blocked |
 | T-302 | Этап 3: тесты потребностей и сохранений | FR-12, FR-13 | qa-tester | T-301 | blocked |
 | T-303 | Этап 3: радиальное меню и взаимодействие с курсором | FR-14, FR-15 | godot-dev | T-301 | blocked |
-| T-304 | Этап 3: трей, настройки, автозапуск | FR-16, FR-17 | native-dev | T-303 | blocked |
+| T-304 | Этап 3: трей, настройки, автозапуск; убрать dev-выход по правому клику; выбрать окончательный bundle id | FR-16, FR-17 | native-dev | T-303 | blocked |
 | T-401 | Этап 4: `SystemProbe` и бэкенд macOS через `OS.execute`, заглушки | FR-18, FR-20 | native-dev | T-304 | blocked |
 | T-402 | Этап 4: реакции героя на систему | FR-19 | godot-dev | T-401 | blocked |
 | T-501 | Этап 5: C++ или Rust, каркас `native/`, окна на macOS. До старта решить M-3 аудита T-005: подпись или отказ от разрешений | FR-21 | native-dev | T-402 | blocked |
@@ -38,5 +38,5 @@
 | T-702 | Этап 7: помодоро и напоминания | FR-28 | godot-dev | T-601 | blocked |
 | T-801 | Этап 8: уровни, трюки, характер, память | FR-29…31 | godot-dev | T-701, T-702 | blocked |
 | T-901 | Этап 9: `docs/ART.md`, cutout-анимации, звуки, полировка | FR-32 | godot-dev | T-801 | blocked |
-| T-1001 | Этап 10: `tools/build.fish`, GitHub Actions, инструкции установки, проверка `.pck` и dylib в сборке, SHA-256 (M-2, M-3) | FR-33…35 | native-dev | T-901 | blocked |
+| T-1001 | Этап 10: `tools/build.fish`, GitHub Actions, инструкции установки, проверка `.pck` и dylib в сборке, SHA-256 (M-2, M-3), сверка версии заголовка и пути инструментов (L-8, L-9) | FR-33…35 | native-dev | T-901 | blocked |
 | T-1002 | Этап 10: финальный аудит безопасности и проверка чистой установки | NFR-3, NFR-4, NFR-6 | security-auditor | T-1001 | blocked |
