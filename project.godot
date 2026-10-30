@@ -29,3 +29,4 @@ window/per_pixel_transparency/allowed=true
 
 renderer/rendering_method="gl_compatibility"
 viewport/transparent_background=true
+textures/vram_compression/import_etc2_astc=true

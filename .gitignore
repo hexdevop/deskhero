@@ -20,3 +20,11 @@ export/
 export_presets.cfg.bak
 .mono/
 data_*/
+native/bin/
+
+# Ключи
+*.p12
+*.pem
+*.key
+*.mobileprovision
+.env

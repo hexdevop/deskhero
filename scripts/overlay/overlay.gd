@@ -44,6 +44,8 @@ func _ready() -> void:
 		placeholder.drag_started.connect(_on_drag_started)
 		placeholder.drag_ended.connect(_on_drag_ended)
 		placeholder.quit_requested.connect(_on_quit_requested)
+	MacosWindow.hide_from_dock()  # macOS: без значка в Dock; без модуля ничего не делает
+	MacosWindow.apply_all_spaces()  # macOS: окно на всех Spaces; без модуля или на другой ОС ничего не делает
 	refresh_work_area()
 	_on_window_resized()  # size_changed может не прийти: границы и полигон нужны сразу
 	_timer = Timer.new()
@@ -103,10 +105,13 @@ func _fit_window() -> void:
 	_fit_attempts += 1
 	window.position = _work_area.position
 	window.size = _work_area.size
+	MacosWindow.apply_all_spaces()  # повторно: после смены окна поведение могло сброситься
 
 
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_APPLICATION_FOCUS_IN or what == NOTIFICATION_WM_DPI_CHANGE:
+		MacosWindow.hide_from_dock()  # на случай, если политика сбросилась
+		MacosWindow.apply_all_spaces()
 		refresh_work_area()
 	elif what == NOTIFICATION_APPLICATION_FOCUS_OUT or what == NOTIFICATION_WM_WINDOW_FOCUS_OUT:
 		_cancel_drag()

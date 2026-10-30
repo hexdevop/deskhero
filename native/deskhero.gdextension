@@ -1,0 +1,10 @@
+[configuration]
+
+entry_symbol = "deskhero_native_init"
+compatibility_minimum = "4.7"
+reloadable = false
+
+[libraries]
+
+macos.debug = "res://native/bin/libdeskhero_native.macos.dylib"
+macos.release = "res://native/bin/libdeskhero_native.macos.dylib"
