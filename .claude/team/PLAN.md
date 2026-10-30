@@ -8,7 +8,7 @@
 
 | ID | Задача | FR | Исполнитель | Зависит от | Статус |
 |---|---|---|---|---|---|
-| T-001 | Поставить Godot 4.7.2, создать `project.godot`, `.gitignore`-правила, `docs/DECISIONS.md`, `README.md` | — | godot-dev | — | todo |
+| T-001 | Поставить Godot 4.7.2, создать `project.godot`, `.gitignore`-правила, `docs/DECISIONS.md`, `README.md` | — | godot-dev | — | done |
 | T-002 | Подключить GUT, зафиксировать версию и команду тестов в `CLAUDE.md`, дымовой тест | — | qa-tester | T-001 | todo |
 | T-003 | Прозрачный оверлей на рабочую область, поверх всех окон, FPS-лимит | FR-1 | godot-dev | T-001 | todo |
 | T-004 | Passthrough-полигон и перетаскиваемый квадрат-плейсхолдер | FR-2 | godot-dev | T-003 | todo |

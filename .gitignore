@@ -13,3 +13,10 @@ export/
 .claude/settings.local.json
 .claude/messages/*
 !.claude/messages/README.md
+
+# Godot: артефакты
+*.translation
+.import/
+export_presets.cfg.bak
+.mono/
+data_*/
