@@ -2,13 +2,16 @@ class_name Overlay
 extends Node
 ## Прозрачное окно без рамки на рабочую область экрана + FPS-режимы.
 ## Флаги окна (прозрачность, без рамки, поверх всех) заданы только в project.godot.
-## Управляет mouse_passthrough_polygon по контуру героя. Связь с героем (пока квадрат) только через EventBus.
+## Управляет mouse_passthrough_polygon по контуру героя. Связь с героем только через EventBus.
 
 @export var config: OverlayConfig
 
 var _screen_index: int = 0
 var _work_area: Rect2i = Rect2i()
+## Эффективная активность: мышь, герой или захват. От неё зависит FPS.
 var _active: bool = false
+var _mouse_active: bool = false
+var _hero_active: bool = false
 var _timer: Timer
 var _linger_timer: Timer
 var _drag_timer: Timer
@@ -45,11 +48,13 @@ func _ready() -> void:
 	_drag_timer.timeout.connect(_on_drag_timeout)
 	add_child(_drag_timer)
 	EventBus.hero_contour_changed.connect(_on_hero_contour_changed)
+	EventBus.hero_activity_changed.connect(_on_hero_activity_changed)
 	EventBus.hero_drag_started.connect(_on_drag_started)
 	EventBus.hero_drag_ended.connect(_on_drag_ended)
 	EventBus.quit_requested.connect(_on_quit_requested)
 	MacosWindow.hide_from_dock()  # macOS: без значка в Dock; без модуля ничего не делает
 	MacosWindow.apply_all_spaces()  # macOS: окно на всех Spaces; без модуля или на другой ОС ничего не делает
+	_update_passthrough()  # до первого контура героя: крошечный полигон, окно не ловит все клики
 	refresh_work_area()
 	_on_window_resized()  # size_changed может не прийти: границы и полигон нужны сразу
 	_timer = Timer.new()
@@ -59,16 +64,24 @@ func _ready() -> void:
 	_timer.start()
 
 
-## Активность: true, 30 FPS; false, FPS покоя.
+## Активность мыши (события над окном): true, 30 FPS; false, снимается таймером.
+## Итоговый режим FPS зависит ещё от героя и захвата.
 func set_active(active: bool) -> void:
-	if active == _active:
-		return
-	_active = active
-	_apply_fps()
+	_mouse_active = active
+	_refresh_active()
 
 
+## Эффективная активность: мышь, герой или захват.
 func is_active() -> bool:
 	return _active
+
+
+func _refresh_active() -> void:
+	var wanted: bool = _mouse_active or _hero_active or _capturing
+	if wanted == _active:
+		return
+	_active = wanted
+	_apply_fps()
 
 
 ## Переключить экран (задел под мульти-мониторы).
@@ -103,8 +116,8 @@ func refresh_work_area() -> void:
 		_fit_attempts = 0
 	_fit_window()
 	if changed:
-		if not _capturing:  # во время drag границы ставит переезд, старый viewport зажал бы квадрат зря
-			_on_window_resized()  # размер окна мог не измениться (экран исчез, новый такого же размера): зажать квадрат
+		if not _capturing:  # во время drag границы ставит переезд, старый viewport зажал бы героя зря
+			_on_window_resized()  # размер окна мог не измениться (экран исчез, новый такого же размера): зажать героя
 
 
 ## Подгонка окна без эмита. Если ОС не дала точный размер, после fit_max_attempts больше не трогаем.
@@ -156,7 +169,7 @@ func _input(event: InputEvent) -> void:
 
 ## Во время drag: экран под курсором и переезд окна. Вызывается из событий, _process не нужен:
 ## AppKit шлёт mouseDragged в окно, где нажали кнопку, и за его пределами (D-009).
-## _input квадрата выполняется раньше (обратный порядок дерева), здесь позиция только уточняется.
+## _input героя выполняется раньше (обратный порядок дерева), здесь позиция только уточняется.
 func _track_drag(event_position: Vector2) -> void:
 	var mouse: Vector2i = DisplayServer.mouse_get_position()
 	_last_drag_mouse = mouse
@@ -192,7 +205,7 @@ func _switch_screen_while_dragging(target: int, mouse: Vector2i) -> void:
 
 ## Масштаб окна к viewport, не ноль.
 func _window_scale() -> Vector2:
-	var scale: Vector2 = PlaceholderSquare.window_scale(Vector2(get_window().size), get_viewport().get_visible_rect().size)
+	var scale: Vector2 = PassthroughShape.window_scale(Vector2(get_window().size), get_viewport().get_visible_rect().size)
 	if scale.x <= 0.0 or scale.y <= 0.0:
 		return Vector2.ONE
 	return scale
@@ -207,8 +220,14 @@ func _cache_screens() -> void:
 
 
 func _on_linger_timeout() -> void:
-	if not _capturing:
-		set_active(false)
+	# снимает только активность мыши: идущий герой остаётся на active_fps
+	_mouse_active = false
+	_refresh_active()
+
+
+func _on_hero_activity_changed(active: bool) -> void:
+	_hero_active = active
+	_refresh_active()
 
 
 func _on_window_resized() -> void:
@@ -228,7 +247,7 @@ func _on_drag_started() -> void:
 	_last_drag_mouse = DisplayServer.mouse_get_position()
 	_linger_timer.stop()
 	_drag_timer.start()
-	set_active(true)
+	_refresh_active()
 	_update_passthrough()  # на время drag окно ловит всю область: курсор не слетает
 
 
@@ -236,16 +255,19 @@ func _on_drag_ended() -> void:
 	_capturing = false
 	_drag_timer.stop()
 	_linger_timer.start()
+	_refresh_active()
 	_on_window_resized()  # границы могли устареть за время drag (экран пропал)
 	_update_passthrough()
 
 
 func _on_drag_timeout() -> void:
 	# курсор двигается без событий (например, над чужим экраном): это не зависание
-	# продлеваем, только пока ОС сообщает зажатую левую кнопку: иначе потерянное отпускание (D-003) оставило бы полный полигон
+	# продлеваем, только пока ОС сообщает зажатую левую кнопку (курсор может стоять): иначе потерянное отпускание (D-003) оставило бы полный полигон
 	var pressed: bool = (DisplayServer.mouse_get_button_state() & MOUSE_BUTTON_MASK_LEFT) != 0
-	if _capturing and pressed and DisplayServer.mouse_get_position() != _last_drag_mouse:
-		_track_drag(Vector2.ZERO)
+	if _capturing and pressed:
+		# кнопка зажата: держим, даже если курсор стоит. Незажатая кнопка (потерянное отпускание) идёт в cancel ниже
+		if DisplayServer.mouse_get_position() != _last_drag_mouse:
+			_track_drag(Vector2.ZERO)
 		_drag_timer.start()
 		return
 	_cancel_drag()
@@ -259,9 +281,9 @@ func _on_quit_requested() -> void:
 func _update_passthrough() -> void:
 	var window: Window = get_window()
 	var view: Vector2 = get_viewport().get_visible_rect().size
-	var scale: Vector2 = PlaceholderSquare.window_scale(Vector2(window.size), view)
+	var scale: Vector2 = PassthroughShape.window_scale(Vector2(window.size), view)
 	var area: Rect2 = Rect2(Vector2.ZERO, view) if _capturing else _hero_rect
-	var polygon: PackedVector2Array = PlaceholderSquare.rect_polygon(area, scale)
+	var polygon: PackedVector2Array = PassthroughShape.hit_polygon(area, scale)
 	if polygon == _last_polygon:
 		return
 	_last_polygon = polygon

@@ -22,12 +22,6 @@ const MAX_FPS: int = 240
 @export_range(1, 10) var fit_max_attempts: int = 3
 ## Сколько держать active_fps после последнего события мыши вне перетаскивания, сек.
 @export_range(0.1, 5.0) var active_linger_sec: float = 0.5
-## Сторона квадрата-плейсхолдера, px окна.
-@export_range(16, 512) var square_size: int = 96
-## Цвет квадрата.
-@export var square_color: Color = Color(0.85, 0.2, 0.25, 1.0)
-## Цвет квадрата во время перетаскивания.
-@export var square_drag_color: Color = Color(1.0, 0.45, 0.3, 1.0)
 ## Страховка: сколько секунд без движения мыши держать перетаскивание, потом принудительно завершить.
 @export_range(1.0, 60.0) var drag_timeout_sec: float = 10.0
 ## Дребезг у границы экранов: на сколько единиц курсор должен зайти в рабочую область нового экрана, чтобы окно переехало.

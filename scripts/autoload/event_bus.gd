@@ -22,3 +22,13 @@ signal hero_drag_ended
 ## Dev-выход.
 @warning_ignore("unused_signal")
 signal quit_requested
+## Герой: активность. true, пока герой шагает каждый кадр; false, когда он спит или стоит.
+@warning_ignore("unused_signal")
+signal hero_activity_changed(active: bool)
+## Герой: смена состояния машины. На этапе 1 слушают только тесты.
+@warning_ignore("unused_signal")
+signal hero_state_changed(from: StringName, to: StringName)
+@warning_ignore("unused_signal")
+signal hero_emotion_changed(emotion: HeroEmotions.Emotion)
+@warning_ignore("unused_signal")
+signal hero_hard_landed(speed: float)

@@ -506,3 +506,48 @@ func test_input_bubbles_to_root_from_deep_leaf() -> void:
 	_m.transition(HeroState.WALK)
 	_m.handle_input(HeroFixture.press_on_body(_ctx))
 	assert_eq(_m.current_id(), HeroState.CARRIED)
+
+
+# --- до start() и после долгого сна
+
+func test_transition_before_start_is_noop() -> void:
+	var ctx: HeroContext = HeroFixture.context(2)
+	var m := HeroStateMachine.new(ctx)
+	watch_signals(m)
+	m.transition(HeroState.WALK)
+	assert_eq(m.current_id(), HeroState.NONE)
+	assert_signal_not_emitted(m, "state_changed")
+	m.update(1.0)
+	m.handle_input(HeroFixture.press_on_body(ctx))
+	assert_eq(m.current_id(), HeroState.NONE, "update и ввод до start() ничего не делают")
+	assert_eq(m.next_tick_sec(), INF)
+
+
+func test_press_with_no_move_then_slow_release_falls() -> void:
+	# пауза без MOVE: PRESS, через 2 с RELEASE в 100 px от места захвата: 50 px/с, ниже порога
+	var p: Vector2 = _ctx.pos + Vector2(0, -10)
+	_m.handle_input(HeroInput.make(HeroInput.Kind.PRESS, p, 1.0))
+	_m.handle_input(HeroInput.make(HeroInput.Kind.RELEASE, p + Vector2(100, 0), 3.0))
+	assert_eq(_m.current_id(), HeroState.FALL)
+	assert_eq(_ctx.velocity, Vector2.ZERO)
+
+
+func test_cursor_stopped_longer_than_window_does_not_throw() -> void:
+	var p: Vector2 = _ctx.pos + Vector2(0, -10)
+	_m.handle_input(HeroInput.make(HeroInput.Kind.PRESS, p, 1.00))
+	_m.handle_input(HeroInput.make(HeroInput.Kind.MOVE, p + Vector2(300, 0), 1.02))
+	_m.handle_input(HeroInput.make(HeroInput.Kind.RELEASE, p + Vector2(300, 0), 1.20))
+	assert_eq(_m.current_id(), HeroState.FALL)
+
+
+func test_idle_update_with_exact_remaining_after_sleep_goes_walk() -> void:
+	var idle: IdleState = _m.get_state(HeroState.IDLE) as IdleState
+	var wait: float = _m.next_tick_sec()
+	assert_eq(wait, idle.remaining_sec)
+	_m.update(wait)
+	assert_eq(_m.current_id(), HeroState.WALK)
+
+
+func test_idle_update_with_huge_elapsed_after_sleep_goes_walk_once() -> void:
+	_m.update(100000.0)
+	assert_eq(_m.current_id(), HeroState.WALK)

@@ -101,3 +101,40 @@ func test_several_violations_all_reported() -> void:
 	b.walk_distance_min_px = 999.0
 	b.throw_min_speed = 9999.0
 	assert_eq(b.validation_errors().size(), 3)
+
+
+func test_wall_restitution_range() -> void:
+	for ok: float in [0.0, 0.4, 1.0]:
+		var b: HeroBalance = HeroFixture.balance()
+		b.wall_restitution = ok
+		assert_true(b.is_valid(), "%s допустимо" % ok)
+	for bad: float in [-0.01, 1.01]:
+		var b: HeroBalance = HeroFixture.balance()
+		b.wall_restitution = bad
+		assert_has(Array(b.validation_errors()), "wall_restitution must be in 0..1", "%s недопустимо" % bad)
+
+
+func test_negative_durations_rejected() -> void:
+	for field: String in ["sulk_sec", "happy_sec", "land_soft_sec", "land_hard_sec", "dev_quit_hold_sec"]:
+		var b: HeroBalance = HeroFixture.balance()
+		b.set(field, -0.1)
+		assert_false(b.is_valid(), "%s < 0 недопустим" % field)
+		b.set(field, 0.0)
+		assert_true(b.is_valid(), "%s = 0 допустим" % field)
+
+
+func test_non_positive_contour_step() -> void:
+	var b: HeroBalance = HeroFixture.balance()
+	b.contour_step_px = 0.0
+	assert_has(Array(b.validation_errors()), "contour_step_px must be positive")
+	b.contour_step_px = -1.0
+	assert_false(b.is_valid())
+
+
+func test_non_positive_gravity_and_walk_speed() -> void:
+	for field: String in ["gravity", "walk_speed"]:
+		var b: HeroBalance = HeroFixture.balance()
+		b.set(field, 0.0)
+		assert_false(b.is_valid(), "%s = 0 недопустим" % field)
+		b.set(field, -5.0)
+		assert_false(b.is_valid(), "%s < 0 недопустим" % field)

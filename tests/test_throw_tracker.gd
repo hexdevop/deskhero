@@ -104,3 +104,38 @@ func test_future_sample_ignored() -> void:
 	_t.add_sample(Vector2(0, 0), 1.0)
 	_t.add_sample(Vector2(50, 0), 1.05)
 	assert_eq(_t.velocity(1.01), Vector2.ZERO, "проба после now не учитывается")
+
+
+func test_stop_shorter_than_window_is_windowed_average() -> void:
+	# Остановка 0.05 с при окне 0.1 с: пробы движения ещё в окне, скорость = смещение / интервал окна (документированное поведение).
+	_t.add_sample(Vector2(0, 0), 1.00)
+	_t.add_sample(Vector2(30, 0), 1.02)
+	_t.add_sample(Vector2(30, 0), 1.07)
+	assert_almost_eq(_t.velocity(1.07).x, 30.0 / 0.07, 0.01)
+
+
+func test_stop_longer_than_window_is_zero() -> void:
+	_t.add_sample(Vector2(0, 0), 1.00)
+	_t.add_sample(Vector2(300, 0), 1.02)
+	_t.add_sample(Vector2(300, 0), 1.15)  # единственная проба в окне, прошлая проба на том же месте
+	assert_eq(_t.velocity(1.15), Vector2.ZERO)
+
+
+func test_pause_without_move_shorter_than_history_uses_previous_sample() -> void:
+	# PRESS в 1.0, пауза 0.15 с без MOVE, RELEASE на 10 px: средняя скорость 66.7 px/с (прошлая проба ещё хранится).
+	_t.add_sample(Vector2(0, 0), 1.0)
+	_t.add_sample(Vector2(10, 0), 1.15)
+	assert_almost_eq(_t.velocity(1.15).x, 10.0 / 0.15, 0.01)
+
+
+func test_pause_without_move_longer_than_history_is_zero() -> void:
+	# Проба старше двух окон вытеснена: после долгой паузы без MOVE скорость ноль, а не бросок.
+	_t.add_sample(Vector2(0, 0), 1.0)
+	_t.add_sample(Vector2(500, 0), 3.0)
+	assert_eq(_t.velocity(3.0), Vector2.ZERO)
+
+
+func test_pause_without_move_and_no_displacement_is_zero() -> void:
+	_t.add_sample(Vector2(40, 40), 1.0)
+	_t.add_sample(Vector2(40, 40), 5.0)
+	assert_eq(_t.velocity(5.0), Vector2.ZERO)
