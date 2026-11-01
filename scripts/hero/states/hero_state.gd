@@ -12,6 +12,23 @@ const LAND: StringName = &"land"
 const FALL: StringName = &"fall"
 const THROWN: StringName = &"thrown"
 const CARRIED: StringName = &"carried"
+const WEB: StringName = &"web"
+const SHOOT_WEB: StringName = &"shoot_web"
+const SWING: StringName = &"swing"
+const HANG: StringName = &"hang"
+const STRETCHED: StringName = &"stretched"
+
+
+## Герой в руке курсора (carried) или на растянутой нити (stretched): drag_started и drag_ended.
+static func is_drag(state_id: StringName) -> bool:
+	return state_id == CARRIED or state_id == STRETCHED
+
+
+## Быстрое движение: Overlay держит motion_fps (D-013).
+static func is_fast(state_id: StringName) -> bool:
+	return state_id == FALL or state_id == THROWN or state_id == CARRIED \
+		or state_id == SWING or state_id == STRETCHED
+
 
 var id: StringName = NONE
 var ctx: HeroContext

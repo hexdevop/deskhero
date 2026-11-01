@@ -42,8 +42,14 @@ func solve(pose: StringName, facing: int, walk_phase: float, emo: HeroEmotions.E
 			_solve_air(v, clock, HeroLook.LEAN_MAX_FALL, false)
 		&"thrown":
 			_solve_air(v, clock, HeroLook.LEAN_MAX_THROWN, true)
-		&"carried":
-			_solve_carried(v, clock)
+		&"carried", &"stretched":
+			_solve_carried(v, clock, 1.0)
+		&"swing":
+			_solve_carried(v, clock, 0.5)
+		&"hang":
+			_solve_carried(v, clock, 0.25)
+		&"shoot_web":
+			_solve_shoot()
 		&"land":
 			_solve_land(land_t, impact)
 		_:
@@ -109,18 +115,25 @@ func _solve_air(v: Vector2, clock: float, lean_max: float, thrown: bool) -> void
 	tuft_shift = Vector2(-v.x, -v.y).limit_length(HeroLook.STRETCH_REF_SPEED) * 0.006
 
 
-func _solve_carried(v: Vector2, clock: float) -> void:
+## kick: размах ног (1 в руках курсора, меньше на нити).
+func _solve_carried(v: Vector2, clock: float, kick_scale: float) -> void:
 	# висит за руки: вращение вокруг верха, ноги раскачиваются по скорости курсора
 	pivot = Vector2(0.0, -HeroLook.DESIGN_HEIGHT + 4.0)
 	lean = clampf(v.x / HeroLook.CARRIED_REF_SPEED, -1.0, 1.0) * HeroLook.LEAN_MAX_CARRIED
 	var k: float = clampf(v.length() / HeroLook.CARRIED_REF_SPEED, 0.0, 1.0)
 	scale = Vector2(1.0 - 0.03 * k, 1.0 + 0.06 + 0.06 * k)
-	var kick: float = sin(clock * HeroLook.FLAP_HZ * 0.7 * TAU) * (1.0 + 2.0 * k)
+	var kick: float = sin(clock * HeroLook.FLAP_HZ * 0.7 * TAU) * (1.0 + 2.0 * k) * kick_scale
 	hand_near = Vector2(HeroLook.SHOULDER_X + 11.0, -42.0)
 	hand_far = Vector2(-HeroLook.SHOULDER_X - 11.0, -42.0)
 	foot_near = Vector2(HeroLook.HIP_X + 1.5 + kick, -2.0)
 	foot_far = Vector2(-HeroLook.HIP_X - 1.5 + kick * 0.6, -1.0)
 	tuft_shift = Vector2(-v.x, -v.y).limit_length(HeroLook.CARRIED_REF_SPEED) * 0.008
+
+
+## Замах паутиной: стоит, ближняя рука поднята к цели.
+func _solve_shoot() -> void:
+	hand_near = Vector2(HeroLook.SHOULDER_X + 9.0, -40.0)
+	tuft_shift = Vector2(-1.0, 0.0)
 
 
 func _solve_land(t: float, impact: float) -> void:

@@ -14,7 +14,7 @@ func enter() -> void:
 func update(delta: float) -> StringName:
 	remaining_sec -= delta
 	if remaining_sec <= 0.0 and not ctx.is_sulking():
-		return WALK
+		return ctx.planner.decide(ctx)
 	return NONE
 
 

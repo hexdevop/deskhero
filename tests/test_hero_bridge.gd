@@ -10,6 +10,7 @@ var _hero: Hero
 func _spawn(units: float = 1.0) -> Hero:
 	var h: Hero = (load("res://scenes/hero/hero.tscn") as PackedScene).instantiate() as Hero
 	h.rng_seed = 11
+	h.balance = HeroFixture.calm_balance()
 	add_child_autofree(h)
 	h.units_per_px = units
 	EventBus.world_bounds_changed.emit(Rect2(0, 0, 800 * units, 600 * units))

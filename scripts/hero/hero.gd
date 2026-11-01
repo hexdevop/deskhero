@@ -252,9 +252,11 @@ func _set_activity(active: bool) -> void:
 
 func _on_state_changed(from: StringName, to: StringName) -> void:
 	EventBus.hero_state_changed.emit(from, to)
-	if to == HeroState.CARRIED:
+	var was_drag: bool = HeroState.is_drag(from)
+	var now_drag: bool = HeroState.is_drag(to)
+	if not was_drag and now_drag:
 		EventBus.hero_drag_started.emit()
-	elif from == HeroState.CARRIED:
+	elif was_drag and not now_drag:
 		_pending_drag_end = true
 
 

@@ -3,11 +3,11 @@ extends Node2D
 ## Процедурный герой из полигонов и дуг (плейсхолдер до этапа 9). Логики нет: получает данные, считает позу
 ## через HeroPose и рисует. Рисует в lpx относительно ступней (0, 0); масштаб в единицы Godot задаёт родитель.
 ## Края сглаживаются: каждая форма обводится замкнутой полилинией с antialiased = true.
-## Перерисовка: каждый кадр, пока герой в движении (walk, fall, thrown, carried, land); в покое только по изменению
+## Перерисовка: каждый кадр, пока герой в движении (walk, fall, thrown, carried, land, swing, hang, stretched); в покое только по изменению
 ## и по редкому таймеру (шаг дыхания, моргание), так что цикл сна не ломается.
 ## Оригинальный герой: индиго-капюшон с кисточкой, бирюзовый костюм, янтарный плащ, открытое лицо. Без символов на груди.
 
-const DYNAMIC_POSES: Array[StringName] = [&"walk", &"fall", &"thrown", &"carried", &"land"]
+const DYNAMIC_POSES: Array[StringName] = [&"walk", &"fall", &"thrown", &"carried", &"land", &"swing", &"hang", &"stretched"]
 const ICON_GAP: float = 10.0
 const MSEC_PER_SEC: float = 1000.0
 

@@ -241,7 +241,7 @@ func _on_hero_activity_changed(active: bool) -> void:
 
 
 func _on_hero_state_changed(_from: StringName, to: StringName) -> void:
-	var fast: bool = to == HeroState.FALL or to == HeroState.THROWN or to == HeroState.CARRIED
+	var fast: bool = HeroState.is_fast(to)
 	if fast == _hero_moving_fast:
 		return
 	_hero_moving_fast = fast

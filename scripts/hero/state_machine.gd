@@ -1,6 +1,7 @@
 class_name HeroStateMachine
 extends RefCounted
-## Иерархическая машина: root > grounded (idle, walk, land), airborne (fall, thrown), carried.
+## Иерархическая машина: root > grounded (idle, walk, land), airborne (fall, thrown), carried,
+## web (shoot_web, swing, hang, stretched).
 ## update и handle_input идут от листа к корню до первого непустого id.
 
 signal state_changed(from: StringName, to: StringName)
@@ -21,6 +22,11 @@ func _init(context: HeroContext) -> void:
 	_add(FallState.new(), HeroState.FALL, airborne)
 	_add(ThrownState.new(), HeroState.THROWN, airborne)
 	_add(CarriedState.new(), HeroState.CARRIED, root)
+	var web := _add(WebState.new(), HeroState.WEB, root)
+	_add(ShootWebState.new(), HeroState.SHOOT_WEB, web)
+	_add(SwingState.new(), HeroState.SWING, web)
+	_add(HangState.new(), HeroState.HANG, web)
+	_add(StretchedState.new(), HeroState.STRETCHED, web)
 
 
 ## Входит в начальный лист (и его предков).
@@ -38,6 +44,7 @@ func update(delta: float) -> void:
 	if _leaf == null:
 		return
 	_ctx.tick_emotions(delta)
+	_ctx.tick_web(delta)
 	var s: HeroState = _leaf
 	while s != null:
 		var next: StringName = s.update(delta)
@@ -61,7 +68,7 @@ func handle_input(input: HeroInput) -> void:
 
 ## Минимум по цепочке листа и по эмоциям.
 func next_tick_sec() -> float:
-	var result: float = _ctx.emotion_wake_sec()
+	var result: float = minf(_ctx.emotion_wake_sec(), _ctx.web_wake_sec())
 	var s: HeroState = _leaf
 	while s != null:
 		result = minf(result, s.next_tick_sec())
