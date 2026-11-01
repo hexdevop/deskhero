@@ -25,6 +25,14 @@ var emotion: HeroEmotions.Emotion = HeroEmotions.Emotion.NEUTRAL
 var blink: bool = false
 ## Смещение кончика кисточки капюшона (ветер).
 var tuft_shift: Vector2 = Vector2.ZERO
+## Точка крепления нити (рука героя) в дизайн-единицах: вокруг неё вид поворачивается по наклону нити.
+## Задаёт HeroView по HeroContext.hand_offset().
+var grip: Vector2 = Vector2(0.0, -72.0)
+## Руки с локтем (на нити, при плетении): локти и признак. Дальняя рука с локтем рисуется позади тела.
+## elbow_far == ZERO: дальняя рука прямая.
+var arms_bent: bool = false
+var elbow_near: Vector2 = Vector2.ZERO
+var elbow_far: Vector2 = Vector2.ZERO
 
 
 ## Считает позу. motion: скорость в lpx/с (мировые оси), land_t: 0..1 по посадке, impact: доля hard_landing_speed 0..1+.
@@ -42,14 +50,20 @@ func solve(pose: StringName, facing: int, walk_phase: float, emo: HeroEmotions.E
 			_solve_air(v, clock, HeroLook.LEAN_MAX_FALL, false)
 		&"thrown":
 			_solve_air(v, clock, HeroLook.LEAN_MAX_THROWN, true)
-		&"carried", &"stretched":
+		&"carried":
 			_solve_carried(v, clock, 1.0)
+		&"stretched":
+			_solve_on_thread(v, clock, 2)
 		&"swing":
-			_solve_carried(v, clock, 0.5)
+			_solve_on_thread(v, clock, 1)
 		&"hang":
-			_solve_carried(v, clock, 0.25)
+			_solve_on_thread(v, clock, 0)
 		&"shoot_web":
 			_solve_shoot()
+		&"weave":
+			_solve_weave(walk_phase, false)
+		&"weave_hang":
+			_solve_weave(walk_phase, true)
 		&"land":
 			_solve_land(land_t, impact)
 		_:
@@ -72,6 +86,9 @@ func _reset() -> void:
 	hand_far = Vector2(-HeroLook.SHOULDER_X - 3.5, -14.5)
 	arms_crossed = false
 	tuft_shift = Vector2.ZERO
+	arms_bent = false
+	elbow_near = Vector2.ZERO
+	elbow_far = Vector2.ZERO
 
 
 func _solve_idle(breath: float) -> void:
@@ -130,10 +147,72 @@ func _solve_carried(v: Vector2, clock: float, kick_scale: float) -> void:
 	tuft_shift = Vector2(-v.x, -v.y).limit_length(HeroLook.CARRIED_REF_SPEED) * 0.008
 
 
-## Замах паутиной: стоит, ближняя рука поднята к цели.
+## Герой висит на нити за обе руки над головой: нить в точке grip между кистями. Наклон тела по нити задаёт
+## HeroView (rope_lean), поэтому своего наклона нет. kind: 0 висит, 1 раскачивается, 2 натянут (тянут за нитку).
+func _solve_on_thread(v: Vector2, clock: float, kind: int) -> void:
+	lean = 0.0
+	var speed_k: float = clampf(v.length() / HeroLook.CARRIED_REF_SPEED, 0.0, 1.0)
+	var pull: float = 1.0 if kind == 2 else 0.0
+	scale = Vector2.ONE  # масштаб идёт вокруг ступней и сдвинул бы руки с нити
+	pivot = grip
+	_reach_up(pull)
+	var trail: float = clampf(-v.x / HeroLook.CARRIED_REF_SPEED, -1.0, 1.0)
+	var sway: float = sin(clock * HeroLook.FLAP_HZ * HeroLook.THREAD_SWAY_HZ_RATIO * TAU) * speed_k * HeroLook.THREAD_SWAY
+	if kind == 0:
+		foot_near = Vector2(HeroLook.HIP_X + 2.0, -1.5)
+		foot_far = Vector2(-HeroLook.HIP_X - 0.5, -2.5)
+	else:
+		# ноги тянутся против движения, ближняя подогнута
+		foot_near = Vector2(HeroLook.HIP_X + 1.5 + trail * HeroLook.THREAD_TRAIL_NEAR + sway, -3.0 - HeroLook.THREAD_FOOT_LIFT * speed_k)
+		foot_far = Vector2(-HeroLook.HIP_X - 1.0 + trail * HeroLook.THREAD_TRAIL_FAR - sway, -1.5 - speed_k)
+	if kind == 2:
+		foot_near = Vector2(HeroLook.HIP_X + 3.0 + sway * HeroLook.PULL_SWAY_K, -1.0)
+		foot_far = Vector2(-HeroLook.HIP_X - 3.0 - sway * HeroLook.PULL_SWAY_K, -2.0)
+	tuft_shift = Vector2(-v.x, -v.y).limit_length(HeroLook.CARRIED_REF_SPEED) * HeroLook.THREAD_TUFT_K
+
+
+## Обе руки вверх к нити. straight 0: локти согнуты наружу, 1: руки почти прямые. Кисти по сторонам grip.
+func _reach_up(straight: float) -> void:
+	arms_bent = true
+	hand_near = grip + Vector2(HeroLook.GRIP_HAND_GAP, HeroLook.GRIP_HAND_RISE)
+	hand_far = grip + Vector2(-HeroLook.GRIP_HAND_GAP, HeroLook.GRIP_HAND_RISE)
+	var out: float = lerpf(HeroLook.ELBOW_OUT, HeroLook.ELBOW_OUT_STRAIGHT, straight)
+	var shoulder_near := Vector2(HeroLook.SHOULDER_X, HeroLook.SHOULDER_Y)
+	var shoulder_far := Vector2(-HeroLook.SHOULDER_X, HeroLook.SHOULDER_Y)
+	elbow_near = shoulder_near.lerp(hand_near, 0.5) + Vector2(out, 0.0)
+	elbow_far = shoulder_far.lerp(hand_far, 0.5) + Vector2(-out, 0.0)
+
+
+## Замах паутиной: стоит, ближняя рука поднята к нити, дальняя вдоль тела.
 func _solve_shoot() -> void:
-	hand_near = Vector2(HeroLook.SHOULDER_X + 9.0, -40.0)
+	arms_bent = true
+	hand_near = grip + Vector2(HeroLook.GRIP_HAND_GAP, HeroLook.GRIP_HAND_RISE)
+	elbow_near = Vector2(HeroLook.SHOULDER_X, HeroLook.SHOULDER_Y).lerp(hand_near, 0.5) + Vector2(HeroLook.ELBOW_OUT, 0.0)
+	elbow_far = Vector2.ZERO
 	tuft_shift = Vector2(-1.0, 0.0)
+
+
+## Плетение: лицом к углу, ближняя рука достаёт до угла (две высоты по шагам, phase 0 или 0.5), дальняя держится
+## за нить (hanging) или опущена. Поза меняется только на шагах плетения.
+func _solve_weave(phase: float, hanging: bool) -> void:
+	var high: bool = phase >= HeroLook.WEAVE_HIGH_PHASE
+	var reach := Vector2(HeroLook.SHOULDER_X + HeroLook.WEAVE_REACH_X, HeroLook.WEAVE_REACH_HIGH if high else HeroLook.WEAVE_REACH_LOW)
+	arms_bent = true
+	if hanging:
+		lean = 0.0
+		pivot = grip
+		hand_far = grip + Vector2(-HeroLook.GRIP_HAND_GAP, HeroLook.GRIP_HAND_RISE)
+		elbow_far = Vector2(-HeroLook.SHOULDER_X, HeroLook.SHOULDER_Y).lerp(hand_far, 0.5) + Vector2(-HeroLook.ELBOW_OUT, 0.0)
+		foot_near = Vector2(HeroLook.HIP_X + 2.0, -1.5)
+		foot_far = Vector2(-HeroLook.HIP_X - 0.5, -2.5)
+	else:
+		lean = HeroLook.WEAVE_LEAN
+		elbow_far = Vector2.ZERO
+		hand_far = Vector2(-HeroLook.SHOULDER_X - 3.5, -14.5)
+		bob = HeroLook.WEAVE_BOB if high else 0.0
+	hand_near = reach
+	elbow_near = Vector2(HeroLook.SHOULDER_X + HeroLook.WEAVE_ELBOW_X, HeroLook.WEAVE_ELBOW_HIGH if high else HeroLook.WEAVE_ELBOW_LOW)
+	tuft_shift = Vector2(HeroLook.WEAVE_TUFT_X, 0.0)
 
 
 func _solve_land(t: float, impact: float) -> void:

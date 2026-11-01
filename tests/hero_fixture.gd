@@ -9,10 +9,11 @@ static func balance() -> HeroBalance:
 	return (load(BALANCE_PATH) as HeroBalance).duplicate() as HeroBalance
 
 
-## Баланс без вылазок: тесты этапа 1 не должны зависеть от seed. Тесты паутины включают вылазки явно.
+## Баланс без вылазок и плетения: тесты этапа 1 не должны зависеть от seed. Тесты паутины включают их явно.
 static func calm_balance() -> HeroBalance:
 	var b: HeroBalance = balance()
 	b.web_trip_chance = 0.0
+	b.weave_idle_sec = INF
 	return b
 
 
@@ -32,6 +33,7 @@ static func context(seed_value: int = 1, bounds: Rect2 = Rect2(0.0, 0.0, 800.0, 
 ## Машина, уже стоящая на полу в idle.
 static func grounded_machine(ctx: HeroContext) -> HeroStateMachine:
 	ctx.balance.web_trip_chance = 0.0
+	ctx.balance.weave_idle_sec = INF
 	ctx.pos = Vector2(ctx.bounds.get_center().x, ctx.floor_y())
 	var m := HeroStateMachine.new(ctx)
 	m.start(HeroState.IDLE)

@@ -26,6 +26,8 @@ func update(delta: float) -> StringName:
 	var plan: WebPlan = ctx.plan
 	if plan == null:
 		return NONE
+	if plan.stage == WebPlan.Stage.WEAVE:
+		return WEAVE  # возврат из stretched во время плетения: продолжаем с того же шага
 	plan.stage_sec += delta
 	if plan.stage == WebPlan.Stage.REST:
 		plan.rest_left_sec -= delta  # пауза идёт всегда; settled разрешает только сон
@@ -49,13 +51,19 @@ func update(delta: float) -> StringName:
 	match plan.stage:
 		WebPlan.Stage.ASCEND:
 			if rope.length <= rope.target_length + LENGTH_EPSILON:
-				_begin(WebPlan.Stage.LOWER)  # плетение (T-213) подключится здесь: WEAVE_TOP -> weave
+				if plan.kind == WebPlan.Kind.WEAVE_TOP:
+					plan.stage = WebPlan.Stage.WEAVE
+					plan.settled = false
+					plan.stage_sec = 0.0
+					return WEAVE
+				_begin(WebPlan.Stage.LOWER)
 		WebPlan.Stage.LOWER:
 			if absf(rope.length - rope.target_length) <= LENGTH_EPSILON:
 				_begin(WebPlan.Stage.REST)
 		WebPlan.Stage.REST:
 			if rope.is_settled(ctx):
 				rope.settle(ctx)
+				ctx.lean = clampf(-rope.angle(ctx), -b.swing_lean_max_rad, b.swing_lean_max_rad)  # без скачка позы при замирании
 				plan.settled = true
 	return NONE
 

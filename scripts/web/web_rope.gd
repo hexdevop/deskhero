@@ -15,6 +15,10 @@ const MAX_ADVANCE_SEC: float = 1.0
 ## Контакт с полом считается ударом, если вертикальная скорость больше этого числа шагов гравитации за подшаг.
 ## Скорость покоя на полу равна gravity * подшаг, так что порог следует за балансом.
 const FLOOR_CONTACT_STEPS: float = 2.5
+## Натяжение для вида (tension): провисшая, натянутая, в полёте.
+const SLACK_TENSION: float = 0.15
+const TAUT_TENSION: float = 0.55
+const TRANSIT_TENSION: float = 0.5
 const ANCHOR_EPSILON: float = 0.5
 const TAUT_EPSILON: float = 0.01
 
@@ -165,6 +169,26 @@ func wake_sec() -> float:
 	if phase == Phase.SHOOTING or phase == Phase.RELEASED:
 		return 0.0
 	return INF
+
+
+## Руку сообщают после обновления состояния (HeroContext.sync_web_hand): оборванная нить уходит от свежей руки,
+## а не от положения прошлого кадра (М6 ревью T-211).
+func sync_hand(p_hand: Vector2) -> void:
+	hand = p_hand
+
+
+## Натяжение для вида, 0..1: провисшая нить 0.15, натянутая 0.55, растянутая пружина до 1. Кончик и тающая нить 0.5.
+func tension(p_hand: Vector2) -> float:
+	match phase:
+		Phase.ATTACHED:
+			var chord: float = p_hand.distance_to(anchor)
+			if chord < length - TAUT_EPSILON:
+				return SLACK_TENSION
+			var stretched: float = clampf((chord - length) / maxf(_balance.thread_max_stretch_px, 1.0), 0.0, 1.0)
+			return lerpf(TAUT_TENSION, 1.0, stretched)
+		Phase.SHOOTING, Phase.RELEASED:
+			return TRANSIT_TENSION
+	return 0.0
 
 
 ## Точки нити от руки (или кончика) к якорю. Натянутая: 2 точки, провисшая: web_sag_points. Пусто в OFF.

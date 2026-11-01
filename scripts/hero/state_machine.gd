@@ -1,7 +1,7 @@
 class_name HeroStateMachine
 extends RefCounted
 ## Иерархическая машина: root > grounded (idle, walk, land), airborne (fall, thrown), carried,
-## web (shoot_web, swing, hang, stretched).
+## web (shoot_web, swing, hang, stretched, weave).
 ## update и handle_input идут от листа к корню до первого непустого id.
 
 signal state_changed(from: StringName, to: StringName)
@@ -27,6 +27,7 @@ func _init(context: HeroContext) -> void:
 	_add(SwingState.new(), HeroState.SWING, web)
 	_add(HangState.new(), HeroState.HANG, web)
 	_add(StretchedState.new(), HeroState.STRETCHED, web)
+	_add(WeaveState.new(), HeroState.WEAVE, web)
 
 
 ## Входит в начальный лист (и его предков).
@@ -50,8 +51,10 @@ func update(delta: float) -> void:
 		var next: StringName = s.update(delta)
 		if next != HeroState.NONE:
 			transition(next)
+			_ctx.sync_web_hand()
 			return
 		s = s.parent
+	_ctx.sync_web_hand()
 
 
 func handle_input(input: HeroInput) -> void:
@@ -62,8 +65,9 @@ func handle_input(input: HeroInput) -> void:
 		var next: StringName = s.handle_input(input)
 		if next != HeroState.NONE:
 			transition(next)
-			return
+			break
 		s = s.parent
+	_ctx.sync_web_hand()
 
 
 ## Минимум по цепочке листа и по эмоциям.

@@ -32,3 +32,16 @@ signal hero_state_changed(from: StringName, to: StringName)
 signal hero_emotion_changed(emotion: HeroEmotions.Emotion)
 @warning_ignore("unused_signal")
 signal hero_hard_landed(speed: float)
+
+## Hero: паутине в углах нужен опрос курсора (true) или больше не нужен (false). Шлётся только при смене.
+@warning_ignore("unused_signal")
+signal cursor_watch_requested(active: bool)
+## Overlay: проба курсора в единицах viewport (координаты окна). valid = false: курсор вне окна или позиция неизвестна.
+## Позиция нигде не пишется в лог и не сохраняется (D-012, п. 5).
+@warning_ignore("unused_signal")
+signal cursor_sampled(pos: Vector2, valid: bool)
+## Hero: паутина в углу сплетена или смахнута. Номер угла CornerWebField.Corner. На этапе 2 слушают только тесты.
+@warning_ignore("unused_signal")
+signal corner_web_woven(corner: int)
+@warning_ignore("unused_signal")
+signal corner_web_swept(corner: int)

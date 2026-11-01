@@ -4,7 +4,7 @@ extends RefCounted
 
 enum Kind { SWING, DESCENT, WEAVE_TOP, WEAVE_BOTTOM }
 ## Этап подвеса (читает hang). Хранится в плане, чтобы переход hang -> stretched -> hang не терял место.
-enum Stage { NONE, ASCEND, LOWER, REST, DESCEND }
+enum Stage { NONE, ASCEND, LOWER, REST, DESCEND, WEAVE }
 
 var kind: Kind = Kind.SWING
 var anchor: Vector2 = Vector2.ZERO
@@ -23,6 +23,8 @@ var rest_left_sec: float = 0.0
 var settled: bool = false
 ## Сколько секунд идёт текущий этап (страховка web_stage_timeout_sec).
 var stage_sec: float = 0.0
+## Плетение уже занято углом (begin_weave вызван): возврат из stretched не начинает его заново.
+var weave_started: bool = false
 
 
 func needs_walk() -> bool:

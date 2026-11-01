@@ -1,15 +1,25 @@
 class_name WebPlanner
 extends RefCounted
 ## Выбор действия и цели паутины в момент конца паузы idle (D-012, п. 1). Работает на ctx.rng: детерминирован.
-## Цели лежат на верхнем и боковых краях области; нижний край не кандидат. Плетение добавляет T-213.
+## Цели лежат на верхнем и боковых краях области; нижний край не кандидат. Плетение в углах идёт первым и от вылазок не зависит.
 
 ## Значение по умолчанию поля swing_safe_height_margin (для сверки в тестах); в игре берётся из баланса.
 const SAFE_HEIGHT_MARGIN: float = 0.85
+## Ближе этого до стены идти не нужно (совпадает с допуском прихода в walk).
+const WALK_ARRIVE_PX: float = 0.5
 
 
-## WALK или SHOOT_WEB; при выстреле план лежит в ctx.plan. Обида запрещает вылазки (проверяет idle).
+## WALK, SHOOT_WEB или WEAVE; план лежит в ctx.plan. Обида запрещает вылазки (проверяет idle).
+## Порядок (ARCHITECTURE): плетение при долгом покое, затем вылазка, иначе обычная прогулка.
 func decide(ctx: HeroContext) -> StringName:
 	var b: HeroBalance = ctx.balance
+	if ctx.calm_sec >= b.weave_idle_sec and ctx.weave_cooldown_sec <= 0.0:
+		var weave: WebPlan = weave_plan(ctx)
+		if weave != null:
+			ctx.plan = weave
+			if weave.needs_walk():
+				return HeroState.WALK  # идти к стене; на месте walk вернёт SHOOT_WEB или WEAVE
+			return HeroState.SHOOT_WEB if weave.kind == WebPlan.Kind.WEAVE_TOP else HeroState.WEAVE
 	if ctx.web_cooldown_sec > 0.0 or ctx.rng.randf() >= b.web_trip_chance:
 		return HeroState.WALK
 	var first_swing: bool = ctx.rng.randf() >= b.web_descent_chance
@@ -96,6 +106,40 @@ func descent_plan(ctx: HeroContext) -> WebPlan:
 	plan.rest_length = clampf(full * ratio, b.hang_top_gap_px, full)
 	if (plan.anchor - (ctx.pos - Vector2(0.0, grip))).length() > b.web_max_length_px:
 		return null
+	return plan
+
+
+## План плетения: свободный угол, до стены которого не дальше weave_walk_max_px; верхний или нижний выбирается случайно.
+## Верхний угол требует высоты области и допустимой длины выстрела. null, если подходящего угла нет.
+func weave_plan(ctx: HeroContext) -> WebPlan:
+	var b: HeroBalance = ctx.balance
+	var half_w: float = b.body_size_px.x * 0.5
+	var min_x: float = ctx.bounds.position.x + half_w
+	var max_x: float = ctx.bounds.end.x - half_w
+	if min_x > max_x:
+		return null
+	var grip: float = ctx.hand_offset().length()
+	var height: float = ctx.floor_y() - ctx.bounds.position.y
+	var top_ok: bool = height >= b.web_min_height_px and height - grip > b.hang_top_gap_px \
+		and height - grip <= b.web_max_length_px
+	var options: Array[int] = []
+	for corner: int in ctx.corners.free_corners():
+		var wall_x: float = min_x if CornerWebField.is_left(corner) else max_x
+		if absf(wall_x - ctx.pos.x) > b.weave_walk_max_px:
+			continue
+		if CornerWebField.is_top(corner) and not top_ok:
+			continue
+		options.append(corner)
+	if options.is_empty():
+		return null
+	var chosen: int = options[ctx.rng.randi() % options.size()]
+	var target_x: float = min_x if CornerWebField.is_left(chosen) else max_x
+	var plan := WebPlan.new()
+	plan.corner = chosen
+	plan.kind = WebPlan.Kind.WEAVE_TOP if CornerWebField.is_top(chosen) else WebPlan.Kind.WEAVE_BOTTOM
+	plan.walk_to_x = target_x if absf(target_x - ctx.pos.x) > WALK_ARRIVE_PX else NAN
+	if plan.kind == WebPlan.Kind.WEAVE_TOP:
+		plan.anchor = Vector2(target_x, ctx.bounds.position.y)
 	return plan
 
 

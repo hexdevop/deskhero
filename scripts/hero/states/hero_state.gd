@@ -17,6 +17,7 @@ const SHOOT_WEB: StringName = &"shoot_web"
 const SWING: StringName = &"swing"
 const HANG: StringName = &"hang"
 const STRETCHED: StringName = &"stretched"
+const WEAVE: StringName = &"weave"
 
 
 ## Герой в руке курсора (carried) или на растянутой нити (stretched): drag_started и drag_ended.

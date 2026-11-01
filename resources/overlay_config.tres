@@ -17,3 +17,4 @@ drag_timeout_sec = 10.0
 screen_switch_margin_px = 8
 screen_switch_cooldown_ms = 250
 drag_resync_px = 24
+cursor_poll_sec = 0.2

@@ -122,7 +122,9 @@ const MIN_ROPE_SUBSTEP_SEC: float = 0.002
 @export var weave_idle_sec: float = 300.0
 @export var weave_step_sec: float = 0.8
 @export var weave_steps: int = 6
-@export var weave_walk_max_px: float = 300.0
+@export var weave_walk_max_px: float = 800.0
+## Пауза после неудачной попытки плетения (прервали, не дошёл), сек.
+@export var weave_retry_sec: float = 120.0
 @export var corner_web_radius_px: float = 110.0
 @export var web_fall_sec: float = 0.5
 @export var sweep_min_speed: float = 500.0
@@ -181,7 +183,7 @@ func _web_errors() -> PackedStringArray:
 		"web_trip_min_interval_sec": web_trip_min_interval_sec, "weave_step_sec": weave_step_sec,
 		"weave_walk_max_px": weave_walk_max_px, "corner_web_radius_px": corner_web_radius_px,
 		"web_fall_sec": web_fall_sec, "sweep_min_speed": sweep_min_speed, "sweep_hit_px": sweep_hit_px,
-		"web_release_fade_sec": web_release_fade_sec, "weave_idle_sec": weave_idle_sec,
+		"web_release_fade_sec": web_release_fade_sec, "sweep_clear_ratio": sweep_clear_ratio, "weave_retry_sec": weave_retry_sec, "weave_idle_sec": weave_idle_sec,
 		"swing_release_angle_max_rad": swing_release_angle_max_rad, "web_stage_timeout_sec": web_stage_timeout_sec,
 		"swing_safe_height_margin": swing_safe_height_margin, "swing_release_start_ratio": swing_release_start_ratio,
 	}

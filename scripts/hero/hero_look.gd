@@ -47,6 +47,31 @@ const BLINK_MIN_SEC: float = 4.0
 const BLINK_MAX_SEC: float = 9.0
 const BLINK_SEC: float = 0.14
 
+# Руки на нити: кисти по сторонам точки крепления, выше неё; локти наружу.
+const GRIP_HAND_GAP: float = 4.6
+const GRIP_HAND_RISE: float = -6.0
+const ELBOW_OUT: float = 24.0
+const ELBOW_OUT_STRAIGHT: float = 12.0
+## Висение, раскачка, натяжение: качание ног от скорости, вынос ног против движения, подъём ближней ноги.
+const THREAD_SWAY: float = 1.2
+const THREAD_SWAY_HZ_RATIO: float = 0.6
+const THREAD_TRAIL_NEAR: float = 9.0
+const THREAD_TRAIL_FAR: float = 11.0
+const THREAD_FOOT_LIFT: float = 3.5
+const THREAD_TUFT_K: float = 0.006
+const PULL_SWAY_K: float = 2.0
+# Плетение: достать рукой до угла (две высоты по шагам), локоть, наклон и подъём тела на втором шаге.
+const WEAVE_REACH_X: float = 17.0
+const WEAVE_REACH_LOW: float = -54.0
+const WEAVE_REACH_HIGH: float = -70.0
+const WEAVE_ELBOW_X: float = 13.0
+const WEAVE_ELBOW_LOW: float = -40.0
+const WEAVE_ELBOW_HIGH: float = -48.0
+const WEAVE_LEAN: float = 0.05
+const WEAVE_BOB: float = -1.0
+const WEAVE_TUFT_X: float = -1.5
+const WEAVE_HIGH_PHASE: float = 0.25
+
 # Ходьба.
 const WALK_STRIDE: float = 7.0
 const WALK_LIFT: float = 3.0

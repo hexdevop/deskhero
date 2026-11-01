@@ -8,10 +8,12 @@ func enter() -> void:
 	ctx.pose = &"carried"
 	ctx.carrying = true
 	ctx.velocity = Vector2.ZERO
+	ctx.calm_sec = 0.0
 
 
 func exit() -> void:
 	ctx.carrying = false
+	ctx.calm_sec = 0.0  # держали сколько угодно: покой считается с отпускания
 
 
 func handle_input(input: HeroInput) -> StringName:

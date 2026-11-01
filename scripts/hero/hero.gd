@@ -32,8 +32,15 @@ var _right_down_usec: int = -1
 var _carry_prev_pos: Vector2 = Vector2.ZERO
 var _carry_prev_usec: int = 0
 var _carry_velocity: Vector2 = Vector2.ZERO
+## Смахивание паутины в углах: прошлая действительная проба курсора (lpx). Позиция нигде не пишется (D-012, п. 5).
+var _cursor_prev: Vector2 = Vector2.ZERO
+var _cursor_prev_usec: int = 0
+var _cursor_has_prev: bool = false
+var _watching_cursor: bool = false
 
 @onready var _view: HeroView = $View
+@onready var _line: WebLine = $WebLine
+@onready var _corner_webs: CornerWebsView = $CornerWebs
 @onready var _timer: Timer = $WakeTimer
 
 
@@ -56,13 +63,16 @@ func _ready() -> void:
 	_ctx.hard_landed.connect(_on_hard_landed)
 	_ctx.emotions.changed.connect(_on_emotion_changed)
 	_machine.state_changed.connect(_on_state_changed)
-	_view.configure(balance.body_size_px)
-	_view.scale = Vector2(units_per_px, units_per_px)
+	_view.configure(balance.body_size_px, _ctx.hand_offset())
+	_apply_view_scale()
+	_ctx.corners.woven.connect(_on_corner_woven)
+	_ctx.corners.swept.connect(_on_corner_swept)
 	_timer.one_shot = true
 	_timer.timeout.connect(_on_wake_timeout)
 	EventBus.world_bounds_changed.connect(_on_world_bounds_changed)
 	EventBus.drag_cursor_resync.connect(_on_drag_cursor_resync)
 	EventBus.drag_cancel_requested.connect(_on_drag_cancel_requested)
+	EventBus.cursor_sampled.connect(_on_cursor_sampled)
 
 
 func get_context() -> HeroContext:
@@ -146,6 +156,7 @@ func _on_wake_timeout() -> void:
 func _on_world_bounds_changed(bounds: Rect2) -> void:
 	if bounds.size.x <= 0.0 or bounds.size.y <= 0.0 or units_per_px <= 0.0:
 		return
+	_cursor_has_prev = false  # проба в старой системе координат даст фиктивный отрезок
 	_advance_sleep()
 	var rescaled: bool = _refresh_units()
 	_ctx.set_bounds(Rect2(bounds.position / units_per_px, bounds.size / units_per_px))
@@ -167,8 +178,16 @@ func _refresh_units() -> bool:
 		return false
 	_system_units = current
 	units_per_px = current
-	_view.scale = Vector2(current, current)
+	_apply_view_scale()
 	return true
+
+
+## Вид, нить и паутина в углах рисуют в lpx: масштаб в единицы Godot у всех один.
+func _apply_view_scale() -> void:
+	var k := Vector2(units_per_px, units_per_px)
+	_view.scale = k
+	_line.scale = k
+	_corner_webs.scale = k
 
 
 func _on_drag_cursor_resync(cursor: Vector2) -> void:
@@ -186,8 +205,13 @@ func _after_step(force_contour: bool) -> void:
 	if position != target:
 		position = target
 	_view.apply(_ctx.pose, _ctx.facing, _ctx.walk_phase, _ctx.emotions.current(), _view_motion(),
-			_ctx.land_progress, _ctx.last_impact_speed / balance.hard_landing_speed)
+			_ctx.land_progress, _ctx.last_impact_speed / balance.hard_landing_speed, _ctx.lean)
+	# нить от руки этого кадра (рука и нить в одной точке, без отставания); в покое точки те же, перерисовки нет
+	var hand: Vector2 = _ctx.hand_pos()
+	_line.apply(_ctx.rope.draw_points(hand), _ctx.rope.tension(hand))
+	_corner_webs.apply(_ctx.corners)
 	_publish_contour(force_contour)
+	_update_cursor_watch()
 	_schedule()
 	if _pending_drag_end:
 		_pending_drag_end = false
@@ -258,6 +282,46 @@ func _on_state_changed(from: StringName, to: StringName) -> void:
 		EventBus.hero_drag_started.emit()
 	elif was_drag and not now_drag:
 		_pending_drag_end = true
+
+
+## Паутине в углах нужен опрос курсора, пока в углах есть нити; сигнал только при смене.
+func _update_cursor_watch() -> void:
+	var needed: bool = _ctx.corners.has_webs()
+	if needed == _watching_cursor:
+		return
+	_watching_cursor = needed
+	_cursor_has_prev = false
+	EventBus.cursor_watch_requested.emit(needed)
+
+
+## Проба курсора от Overlay (единицы viewport). Недействительная обрывает отрезок. Иначе отрезок между двумя
+## пробами смахивает паутину; при изменении герой просыпается и показывает падение нитей. Пустая проба героя не будит.
+func _on_cursor_sampled(pos: Vector2, valid: bool) -> void:
+	if not _started:
+		return
+	if not valid:
+		_cursor_has_prev = false
+		return
+	var now: int = Time.get_ticks_usec()
+	var current: Vector2 = pos / units_per_px
+	var swept: bool = false
+	if _cursor_has_prev:
+		var dt: float = float(now - _cursor_prev_usec) / MICROS_PER_SEC
+		swept = _ctx.corners.sweep(_cursor_prev, current, dt)
+	_cursor_prev = current
+	_cursor_prev_usec = now
+	_cursor_has_prev = true
+	if swept:
+		_advance_sleep()
+		_after_step(false)
+
+
+func _on_corner_woven(corner: int) -> void:
+	EventBus.corner_web_woven.emit(corner)
+
+
+func _on_corner_swept(corner: int) -> void:
+	EventBus.corner_web_swept.emit(corner)
 
 
 func _on_emotion_changed(emotion: HeroEmotions.Emotion) -> void:

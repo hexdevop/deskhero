@@ -4,10 +4,15 @@ extends Node2D
 ## через HeroPose и рисует. Рисует в lpx относительно ступней (0, 0); масштаб в единицы Godot задаёт родитель.
 ## Края сглаживаются: каждая форма обводится замкнутой полилинией с antialiased = true.
 ## Перерисовка: каждый кадр, пока герой в движении (walk, fall, thrown, carried, land, swing, hang, stretched); в покое только по изменению
-## и по редкому таймеру (шаг дыхания, моргание), так что цикл сна не ломается.
+## и по редкому таймеру (шаг дыхания, моргание), так что цикл сна не ломается. Замерший на нитке или плетущий герой
+## перерисовывается только когда меняется поза, наклон по нити или шаг плетения.
+## Наклон по нити (rope_lean) поворачивает всё тело вокруг руки: точки крепления нити (grip).
 ## Оригинальный герой: индиго-капюшон с кисточкой, бирюзовый костюм, янтарный плащ, открытое лицо. Без символов на груди.
 
 const DYNAMIC_POSES: Array[StringName] = [&"walk", &"fall", &"thrown", &"carried", &"land", &"swing", &"hang", &"stretched"]
+## Позы, у которых walk_phase задаёт шаг плетения: перерисовка при смене фазы, не каждый кадр.
+const PHASE_POSES: Array[StringName] = [&"weave", &"weave_hang"]
+const LEAN_EPSILON: float = 0.0005
 const ICON_GAP: float = 10.0
 const MSEC_PER_SEC: float = 1000.0
 
@@ -19,6 +24,9 @@ var _walk_phase: float = 0.0
 var _motion: Vector2 = Vector2.ZERO
 var _land_t: float = 0.0
 var _impact: float = 0.0
+var _rope_lean: float = 0.0
+## Рука героя (точка крепления нити) относительно ступней, lpx. По умолчанию как у rope_grip_height_ratio 0.9.
+var _grip: Vector2 = Vector2(0.0, -72.0)
 var _breath: float = 0.0
 var _breath_step: int = 0
 var _blink: bool = false
@@ -38,8 +46,10 @@ func _ready() -> void:
 	_sync_idle_anim()
 
 
-func configure(body_size: Vector2) -> void:
+## grip: смещение руки от ступней (HeroContext.hand_offset); NAN по x: по умолчанию 0.9 высоты тела.
+func configure(body_size: Vector2, grip: Vector2 = Vector2(NAN, NAN)) -> void:
 	_size = body_size
+	_grip = Vector2(0.0, -body_size.y * 0.9) if is_nan(grip.x) else grip
 	queue_redraw()
 
 
@@ -56,11 +66,15 @@ func set_idle_phase(breath_step: int, blink_closed: bool) -> void:
 	queue_redraw()
 
 
-## motion: скорость в lpx/с; land_t: 0..1 по посадке; impact: ударная скорость как доля hard_landing_speed.
+## motion: скорость в lpx/с; land_t: 0..1 по посадке; impact: ударная скорость как доля hard_landing_speed;
+## rope_lean: наклон по нити в радианах вокруг руки (HeroContext.lean).
 func apply(pose: StringName, facing: int, walk_phase: float, emotion: HeroEmotions.Emotion,
-		motion: Vector2 = Vector2.ZERO, land_t: float = 0.0, impact: float = 0.0) -> void:
+		motion: Vector2 = Vector2.ZERO, land_t: float = 0.0, impact: float = 0.0, rope_lean: float = 0.0) -> void:
 	var dynamic: bool = DYNAMIC_POSES.has(pose)
-	var changed: bool = pose != _pose or facing != _facing or emotion != _emotion
+	var changed: bool = pose != _pose or facing != _facing or emotion != _emotion \
+		or absf(rope_lean - _rope_lean) > LEAN_EPSILON \
+		or (PHASE_POSES.has(pose) and not is_equal_approx(walk_phase, _walk_phase))
+	_rope_lean = rope_lean
 	_pose = pose
 	_facing = facing
 	_emotion = emotion
@@ -75,21 +89,28 @@ func apply(pose: StringName, facing: int, walk_phase: float, emotion: HeroEmotio
 
 
 func _draw() -> void:
-	_data.solve(_pose, _facing, _walk_phase, _emotion, _motion, _land_t, _impact, _breath, _blink, _clock())
 	var s: float = _size.y / HeroLook.DESIGN_HEIGHT
+	_data.grip = _grip / s
+	_data.solve(_pose, _facing, _walk_phase, _emotion, _motion, _land_t, _impact, _breath, _blink, _clock())
 	var squash := Transform2D(Vector2(_data.scale.x, 0.0), Vector2(0.0, _data.scale.y), Vector2.ZERO)
 	var lean := Transform2D(0.0, _data.pivot) * Transform2D(_data.lean, Vector2.ZERO) * Transform2D(0.0, -_data.pivot)
 	var flip := Transform2D(Vector2(s * float(_facing), 0.0), Vector2(0.0, s), Vector2.ZERO)
-	draw_set_transform_matrix(flip * lean * squash)
+	# наклон по нити: поворот вокруг руки в lpx; на нуле это единичное преобразование
+	var rope_rot := Transform2D(0.0, _grip) * Transform2D(_rope_lean, Vector2.ZERO) * Transform2D(0.0, -_grip)
+	draw_set_transform_matrix(rope_rot * flip * lean * squash)
 	_draw_cape()
 	_draw_leg(_data.foot_far, -HeroLook.HIP_X, HeroLook.SUIT_SHADE)
 	_draw_leg(_data.foot_near, HeroLook.HIP_X, HeroLook.SUIT)
+	var far_behind: bool = _data.arms_bent and _data.elbow_far != Vector2.ZERO
+	if far_behind:
+		_draw_arm(_data.hand_far, -HeroLook.SHOULDER_X, HeroLook.SUIT_SHADE, false, _data.elbow_far)
 	_draw_torso()
 	_draw_collar()
 	_draw_head()
-	_draw_arm(_data.hand_far, -HeroLook.SHOULDER_X, HeroLook.SUIT_SHADE, false)
-	_draw_arm(_data.hand_near, HeroLook.SHOULDER_X, HeroLook.SUIT, true)
-	draw_set_transform_matrix(Transform2D(0.0, Vector2.ZERO))
+	if not far_behind:
+		_draw_arm(_data.hand_far, -HeroLook.SHOULDER_X, HeroLook.SUIT_SHADE, false, _data.elbow_far)
+	_draw_arm(_data.hand_near, HeroLook.SHOULDER_X, HeroLook.SUIT, true, _data.elbow_near)
+	draw_set_transform_matrix(rope_rot)
 	_draw_icon(-HeroLook.DESIGN_HEIGHT * s * _data.scale.y - ICON_GAP * s)
 
 
@@ -208,11 +229,18 @@ func _draw_face(fc: Vector2) -> void:
 		_blush(fc + Vector2(10.5, 6.5), Vector2(3.0, 1.9) * blush_k, cheek)
 
 
-func _draw_arm(hand: Vector2, shoulder_x: float, color: Color, device: bool) -> void:
+## elbow == ZERO: прямая рука, иначе плечо - локоть - кисть одной полосой.
+func _draw_arm(hand: Vector2, shoulder_x: float, color: Color, device: bool, elbow: Vector2 = Vector2.ZERO) -> void:
 	var shoulder: Vector2 = Vector2(shoulder_x, HeroLook.SHOULDER_Y + _data.bob)
-	_shape(HeroShapes.capsule(shoulder, hand, 3.3), color)
+	var bent: bool = _data.arms_bent and elbow != Vector2.ZERO
+	if bent:
+		var bend: Vector2 = elbow + Vector2(0.0, _data.bob)
+		var ctrl: Vector2 = shoulder.lerp(hand, 0.5) + (bend - shoulder.lerp(hand, 0.5)) * 1.7
+		_shape(HeroShapes.stroke(HeroShapes.bezier(shoulder, ctrl, hand, 7), 3.3), color)
+	else:
+		_shape(HeroShapes.capsule(shoulder, hand, 3.3), color)
 	if device:
-		var wrist: Vector2 = shoulder.lerp(hand, 0.72)
+		var wrist: Vector2 = (elbow + Vector2(0.0, _data.bob)).lerp(hand, 0.62) if bent else shoulder.lerp(hand, 0.72)
 		draw_circle(wrist, 2.1, HeroLook.MINT, true, -1.0, true)
 		draw_arc(wrist, 2.1, 0.0, TAU, 12, HeroLook.INK, 1.0, true)
 	_shape(HeroShapes.ellipse(hand, Vector2(3.7, 3.7), 16), HeroLook.CAPE, 1.4)

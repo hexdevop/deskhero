@@ -10,10 +10,13 @@ func enter() -> void:
 	ctx.pose = &"stretched"
 	ctx.carrying = true
 	ctx.velocity = Vector2.ZERO
+	ctx.calm_sec = 0.0
+	_update_lean()
 
 
 func exit() -> void:
 	ctx.carrying = false
+	ctx.calm_sec = 0.0
 	ctx.emotions.clear_temporary()
 
 
@@ -21,6 +24,7 @@ func update(_delta: float) -> StringName:
 	if not ctx.rope.anchor_valid(ctx.bounds):
 		_snap()
 		return CARRIED
+	_update_lean()
 	return NONE
 
 
@@ -43,6 +47,7 @@ func handle_input(input: HeroInput) -> StringName:
 				target = ctx.clamp_pos(rope.anchor + d / r * max_r - offset)
 			ctx.pos = target
 			ctx.throw_tracker.add_sample(input.pos, input.now_sec)
+			_update_lean()
 		HeroInput.Kind.RESYNC:
 			# якорь принадлежит прежней системе координат (смена монитора): рвём
 			ctx.throw_tracker.reset()
@@ -54,6 +59,12 @@ func handle_input(input: HeroInput) -> StringName:
 			ctx.velocity = Vector2.ZERO
 			return HANG
 	return NONE
+
+
+## Наклон по нити: герой висит вдоль неё, пока её тянут (вид поворачивается вокруг руки).
+func _update_lean() -> void:
+	var limit: float = ctx.balance.swing_lean_max_rad
+	ctx.lean = clampf(-ctx.rope.angle(ctx), -limit, limit)
 
 
 func _snap() -> void:

@@ -17,6 +17,8 @@ var _hero_moving_fast: bool = false
 var _timer: Timer
 var _linger_timer: Timer
 var _drag_timer: Timer
+## Опрос курсора для смахивания паутины в углах: работает только по запросу героя (D-012, п. 5).
+var _cursor_timer: Timer
 var _fit_attempts: int = 0
 var _capturing: bool = false
 ## Контур героя из hero_contour_changed, в единицах viewport.
@@ -49,6 +51,11 @@ func _ready() -> void:
 	_drag_timer.wait_time = config.drag_timeout_sec
 	_drag_timer.timeout.connect(_on_drag_timeout)
 	add_child(_drag_timer)
+	_cursor_timer = Timer.new()
+	_cursor_timer.wait_time = config.cursor_poll_sec
+	_cursor_timer.timeout.connect(_on_cursor_poll)
+	add_child(_cursor_timer)
+	EventBus.cursor_watch_requested.connect(_on_cursor_watch_requested)
 	EventBus.hero_contour_changed.connect(_on_hero_contour_changed)
 	EventBus.hero_activity_changed.connect(_on_hero_activity_changed)
 	EventBus.hero_state_changed.connect(_on_hero_state_changed)
@@ -291,6 +298,31 @@ func _on_drag_timeout() -> void:
 	_cancel_drag()
 
 
+## Герой просит включить или выключить опрос курсора. Без запроса таймер не идёт.
+func _on_cursor_watch_requested(active: bool) -> void:
+	if _cursor_timer == null:
+		return
+	if active:
+		if _cursor_timer.is_stopped():
+			_cursor_timer.start()
+	else:
+		_cursor_timer.stop()
+
+
+func is_polling_cursor() -> bool:
+	return _cursor_timer != null and not _cursor_timer.is_stopped()
+
+
+## Проба: глобальная позиция курсора, переведённая в координаты окна (единицы viewport, как в _track_drag).
+## Позиция идёт только в сигнал и никуда не пишется.
+func _on_cursor_poll() -> void:
+	var window: Window = get_window()
+	var mouse: Vector2i = DisplayServer.mouse_get_position()
+	var valid: bool = cursor_is_valid(mouse, Rect2i(window.position, window.size))
+	var local: Vector2 = Vector2(mouse - window.position) / _window_scale() if valid else Vector2.ZERO
+	EventBus.cursor_sampled.emit(local, valid)
+
+
 func _on_quit_requested() -> void:
 	get_tree().quit()
 
@@ -323,6 +355,13 @@ static func screen_at_point(point: Vector2i, rects: Array[Rect2i], margin: int =
 		if inner.size.x > 0 and inner.size.y > 0 and inner.has_point(point):
 			return i
 	return -1
+
+
+## Чистая функция: проба курсора действительна. mouse_get_position вне экранов (и без глобальной позиции, Wayland)
+## отдаёт (0, 0), это левый верхний угол основного экрана, где может висеть паутина (D-009, D-012): такая проба
+## и проба вне окна недействительны.
+static func cursor_is_valid(mouse: Vector2i, window_rect: Rect2i) -> bool:
+	return mouse != Vector2i.ZERO and window_rect.has_point(mouse)
 
 
 ## Чистая функция: лежит ли точка хотя бы в одной области.
