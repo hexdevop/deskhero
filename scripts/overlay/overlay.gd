@@ -2,12 +2,9 @@ class_name Overlay
 extends Node
 ## Прозрачное окно без рамки на рабочую область экрана + FPS-режимы.
 ## Флаги окна (прозрачность, без рамки, поверх всех) заданы только в project.godot.
-## Управляет mouse_passthrough_polygon по контуру квадрата. EventBus пока нет: связь через сигналы.
-
-signal work_area_changed(rect: Rect2i)
+## Управляет mouse_passthrough_polygon по контуру героя. Связь с героем (пока квадрат) только через EventBus.
 
 @export var config: OverlayConfig
-@export var placeholder: PlaceholderSquare
 
 var _screen_index: int = 0
 var _work_area: Rect2i = Rect2i()
@@ -17,6 +14,8 @@ var _linger_timer: Timer
 var _drag_timer: Timer
 var _fit_attempts: int = 0
 var _capturing: bool = false
+## Контур героя из hero_contour_changed, в единицах viewport.
+var _hero_rect: Rect2 = Rect2()
 var _last_polygon: PackedVector2Array = PackedVector2Array()
 ## Кэш на время drag: рабочие области и полные рамки экранов, в единицах Godot (см. D-009).
 var _usable_rects: Array[Rect2i] = []
@@ -45,11 +44,10 @@ func _ready() -> void:
 	_drag_timer.wait_time = config.drag_timeout_sec
 	_drag_timer.timeout.connect(_on_drag_timeout)
 	add_child(_drag_timer)
-	if placeholder != null:
-		placeholder.rect_changed.connect(_on_square_rect_changed)
-		placeholder.drag_started.connect(_on_drag_started)
-		placeholder.drag_ended.connect(_on_drag_ended)
-		placeholder.quit_requested.connect(_on_quit_requested)
+	EventBus.hero_contour_changed.connect(_on_hero_contour_changed)
+	EventBus.hero_drag_started.connect(_on_drag_started)
+	EventBus.hero_drag_ended.connect(_on_drag_ended)
+	EventBus.quit_requested.connect(_on_quit_requested)
 	MacosWindow.hide_from_dock()  # macOS: без значка в Dock; без модуля ничего не делает
 	MacosWindow.apply_all_spaces()  # macOS: окно на всех Spaces; без модуля или на другой ОС ничего не делает
 	refresh_work_area()
@@ -107,7 +105,6 @@ func refresh_work_area() -> void:
 	if changed:
 		if not _capturing:  # во время drag границы ставит переезд, старый viewport зажал бы квадрат зря
 			_on_window_resized()  # размер окна мог не измениться (экран исчез, новый такого же размера): зажать квадрат
-		work_area_changed.emit(rect)
 
 
 ## Подгонка окна без эмита. Если ОС не дала точный размер, после fit_max_attempts больше не трогаем.
@@ -138,8 +135,7 @@ func _notification(what: int) -> void:
 
 
 func _cancel_drag() -> void:
-	if placeholder != null:
-		placeholder.cancel_drag()
+	EventBus.drag_cancel_requested.emit()
 
 
 func _apply_fps() -> void:
@@ -162,8 +158,6 @@ func _input(event: InputEvent) -> void:
 ## AppKit шлёт mouseDragged в окно, где нажали кнопку, и за его пределами (D-009).
 ## _input квадрата выполняется раньше (обратный порядок дерева), здесь позиция только уточняется.
 func _track_drag(event_position: Vector2) -> void:
-	if placeholder == null:
-		return
 	var mouse: Vector2i = DisplayServer.mouse_get_position()
 	_last_drag_mouse = mouse
 	if not point_in_any(mouse, _screen_rects):
@@ -177,7 +171,7 @@ func _track_drag(event_position: Vector2) -> void:
 	if now - _last_switch_msec < config.screen_switch_cooldown_ms:
 		var local: Vector2 = Vector2(mouse - get_window().position) / _window_scale()
 		if (event_position - local).length() > float(config.drag_resync_px):
-			placeholder.drag_to(local)  # событие пришло ещё в координатах старого окна
+			EventBus.drag_cursor_resync.emit(local)  # событие пришло ещё в координатах старого окна
 
 
 func _switch_screen_while_dragging(target: int, mouse: Vector2i) -> void:
@@ -191,8 +185,8 @@ func _switch_screen_while_dragging(target: int, mouse: Vector2i) -> void:
 		refresh_work_area()
 		return
 	# viewport обновится позже, поэтому границы считаем из рабочей области сами
-	placeholder.set_bounds(Rect2(Vector2.ZERO, Vector2(_work_area.size) / scale))
-	placeholder.drag_to(Vector2(mouse - _work_area.position) / scale)
+	EventBus.world_bounds_changed.emit(Rect2(Vector2.ZERO, Vector2(_work_area.size) / scale))
+	EventBus.drag_cursor_resync.emit(Vector2(mouse - _work_area.position) / scale)
 	_update_passthrough()
 
 
@@ -219,11 +213,12 @@ func _on_linger_timeout() -> void:
 
 func _on_window_resized() -> void:
 	var size: Vector2 = get_viewport().get_visible_rect().size
-	if placeholder != null and size.x > 0.0 and size.y > 0.0:
-		placeholder.set_bounds(Rect2(Vector2.ZERO, size))  # эмитит rect_changed, полигон обновится
+	if size.x > 0.0 and size.y > 0.0:
+		EventBus.world_bounds_changed.emit(Rect2(Vector2.ZERO, size))  # герой ответит hero_contour_changed, полигон обновится
 
 
-func _on_square_rect_changed(_rect: Rect2) -> void:
+func _on_hero_contour_changed(rect: Rect2) -> void:
+	_hero_rect = rect
 	_update_passthrough()
 
 
@@ -262,12 +257,10 @@ func _on_quit_requested() -> void:
 
 ## Обновляет полигон, только если он отличается от установленного.
 func _update_passthrough() -> void:
-	if placeholder == null:
-		return
 	var window: Window = get_window()
 	var view: Vector2 = get_viewport().get_visible_rect().size
 	var scale: Vector2 = PlaceholderSquare.window_scale(Vector2(window.size), view)
-	var area: Rect2 = Rect2(Vector2.ZERO, view) if _capturing else placeholder.get_rect()
+	var area: Rect2 = Rect2(Vector2.ZERO, view) if _capturing else _hero_rect
 	var polygon: PackedVector2Array = PlaceholderSquare.rect_polygon(area, scale)
 	if polygon == _last_polygon:
 		return

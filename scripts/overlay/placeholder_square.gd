@@ -1,13 +1,7 @@
 class_name PlaceholderSquare
 extends Node2D
 ## Квадрат-плейсхолдер героя: таскается левой кнопкой, правый клик завершает приложение (dev-выход).
-## Координаты — в системе окна (viewport). Не знает про Overlay: общается сигналами.
-
-signal drag_started
-signal drag_ended
-## Контур изменился (позиция/размер/границы), не вызывается каждый кадр.
-signal rect_changed(rect: Rect2)
-signal quit_requested
+## Координаты — в системе окна (viewport). Не знает про Overlay: общается через EventBus.
 
 @export var config: OverlayConfig
 
@@ -21,6 +15,9 @@ func _ready() -> void:
 	if config == null:
 		config = OverlayConfig.new()
 	_side = float(config.square_size)
+	EventBus.world_bounds_changed.connect(set_bounds)
+	EventBus.drag_cursor_resync.connect(drag_to)
+	EventBus.drag_cancel_requested.connect(cancel_drag)
 
 
 func get_rect() -> Rect2:
@@ -59,7 +56,7 @@ func set_bounds(bounds: Rect2) -> void:
 	if first or clamped != position:
 		position = clamped
 		queue_redraw()
-	rect_changed.emit(get_rect())
+	EventBus.hero_contour_changed.emit(get_rect())
 
 
 func _input(event: InputEvent) -> void:
@@ -72,7 +69,7 @@ func _input(event: InputEvent) -> void:
 				_end_drag()
 		elif button.button_index == MOUSE_BUTTON_RIGHT and button.pressed:
 			if get_rect().has_point(button.position):
-				quit_requested.emit()
+				EventBus.quit_requested.emit()
 	elif event is InputEventMouseMotion and _dragging:
 		var motion: InputEventMouseMotion = event
 		if (motion.button_mask & MOUSE_BUTTON_MASK_LEFT) == 0:
@@ -88,14 +85,14 @@ func _start_drag(mouse: Vector2) -> void:
 	_dragging = true
 	_grab_offset = mouse - position
 	queue_redraw()
-	drag_started.emit()
+	EventBus.hero_drag_started.emit()
 
 
 func _end_drag() -> void:
 	_dragging = false
 	queue_redraw()
-	drag_ended.emit()
-	rect_changed.emit(get_rect())
+	EventBus.hero_drag_ended.emit()
+	EventBus.hero_contour_changed.emit(get_rect())
 
 
 func _draw() -> void:

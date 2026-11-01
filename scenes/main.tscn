@@ -4,10 +4,9 @@
 [ext_resource type="Resource" path="res://resources/overlay_config.tres" id="2"]
 [ext_resource type="Script" path="res://scripts/overlay/placeholder_square.gd" id="3"]
 
-[node name="Main" type="Node" node_paths=PackedStringArray("placeholder")]
+[node name="Main" type="Node"]
 script = ExtResource("1")
 config = ExtResource("2")
-placeholder = NodePath("Square")
 
 [node name="Square" type="Node2D" parent="."]
 script = ExtResource("3")
