@@ -37,6 +37,17 @@ func cancel_drag() -> void:
 		_end_drag()
 
 
+## Поставить квадрат под курсор во время drag с сохранённой точкой захвата.
+## cursor — в координатах окна. Нужен, когда окно переехало и позиция из события устарела.
+func drag_to(cursor: Vector2) -> void:
+	if not _dragging:
+		return
+	var target: Vector2 = clamp_position(cursor - _grab_offset, Vector2(_side, _side), _bounds)
+	if target != position:
+		position = target
+		queue_redraw()
+
+
 ## Границы (область окна). Квадрат втягивается внутрь. Первый вызов ставит его в центр.
 func set_bounds(bounds: Rect2) -> void:
 	var first: bool = _bounds.size == Vector2.ZERO

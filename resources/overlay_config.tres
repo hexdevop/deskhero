@@ -16,3 +16,6 @@ square_size = 96
 square_color = Color(0.85, 0.2, 0.25, 1)
 square_drag_color = Color(1, 0.45, 0.3, 1)
 drag_timeout_sec = 10.0
+screen_switch_margin_px = 8
+screen_switch_cooldown_ms = 250
+drag_resync_px = 24

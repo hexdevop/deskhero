@@ -18,6 +18,12 @@ var _drag_timer: Timer
 var _fit_attempts: int = 0
 var _capturing: bool = false
 var _last_polygon: PackedVector2Array = PackedVector2Array()
+## Кэш на время drag: рабочие области и полные рамки экранов, в единицах Godot (см. D-009).
+var _usable_rects: Array[Rect2i] = []
+var _screen_rects: Array[Rect2i] = []
+var _last_switch_msec: int = -1000000
+var _last_drag_mouse: Vector2i = Vector2i.ZERO
+var _screen_count: int = 0
 
 
 func _ready() -> void:
@@ -81,7 +87,15 @@ func get_work_area() -> Rect2i:
 func refresh_work_area() -> void:
 	if not is_inside_tree() or config == null:
 		return
-	_screen_index = resolve_screen(_screen_index, DisplayServer.get_primary_screen(), DisplayServer.get_screen_count())
+	var count: int = DisplayServer.get_screen_count()
+	if count != _screen_count:
+		# экраны добавились или пропали: индексы могли сдвинуться, идём на основной
+		if _screen_count != 0:
+			_screen_index = DisplayServer.get_primary_screen()
+		_screen_count = count
+	_screen_index = resolve_screen(_screen_index, DisplayServer.get_primary_screen(), count)
+	if _capturing:
+		_cache_screens()  # кэш не должен устаревать, даже если рабочая область не изменилась
 	var rect: Rect2i = DisplayServer.screen_get_usable_rect(_screen_index)
 	if rect.size.x <= 0 or rect.size.y <= 0:
 		return
@@ -91,6 +105,8 @@ func refresh_work_area() -> void:
 		_fit_attempts = 0
 	_fit_window()
 	if changed:
+		if not _capturing:  # во время drag границы ставит переезд, старый viewport зажал бы квадрат зря
+			_on_window_resized()  # размер окна мог не измениться (экран исчез, новый такого же размера): зажать квадрат
 		work_area_changed.emit(rect)
 
 
@@ -135,8 +151,65 @@ func _input(event: InputEvent) -> void:
 		set_active(true)
 		if _capturing:
 			_drag_timer.start()  # движение мыши продлевает страховку
+			if event is InputEventMouseMotion:
+				var motion: InputEventMouseMotion = event
+				_track_drag(motion.position)
 		else:
 			_linger_timer.start()
+
+
+## Во время drag: экран под курсором и переезд окна. Вызывается из событий, _process не нужен:
+## AppKit шлёт mouseDragged в окно, где нажали кнопку, и за его пределами (D-009).
+## _input квадрата выполняется раньше (обратный порядок дерева), здесь позиция только уточняется.
+func _track_drag(event_position: Vector2) -> void:
+	if placeholder == null:
+		return
+	var mouse: Vector2i = DisplayServer.mouse_get_position()
+	_last_drag_mouse = mouse
+	if not point_in_any(mouse, _screen_rects):
+		return  # mouse_get_position вне экранов отдаёт (0, 0): не верим
+	var now: int = Time.get_ticks_msec()
+	var target: int = screen_at_point(mouse, _usable_rects, config.screen_switch_margin_px)
+	if target >= 0 and target != _screen_index and now - _last_switch_msec >= config.screen_switch_cooldown_ms:
+		_switch_screen_while_dragging(target, mouse)
+		_last_switch_msec = now
+		return
+	if now - _last_switch_msec < config.screen_switch_cooldown_ms:
+		var local: Vector2 = Vector2(mouse - get_window().position) / _window_scale()
+		if (event_position - local).length() > float(config.drag_resync_px):
+			placeholder.drag_to(local)  # событие пришло ещё в координатах старого окна
+
+
+func _switch_screen_while_dragging(target: int, mouse: Vector2i) -> void:
+	var window: Window = get_window()
+	var scale: Vector2 = _window_scale()  # до переезда: viewport ещё не обновился
+	var previous: int = _screen_index
+	set_screen(target)  # окно на рабочую область нового экрана, MacosWindow.apply_all_spaces внутри _fit_window
+	if _work_area != DisplayServer.screen_get_usable_rect(target) or window.position != _work_area.position:
+		# пустая область или ОС не дала переехать: откат на прежний экран
+		_screen_index = previous
+		refresh_work_area()
+		return
+	# viewport обновится позже, поэтому границы считаем из рабочей области сами
+	placeholder.set_bounds(Rect2(Vector2.ZERO, Vector2(_work_area.size) / scale))
+	placeholder.drag_to(Vector2(mouse - _work_area.position) / scale)
+	_update_passthrough()
+
+
+## Масштаб окна к viewport, не ноль.
+func _window_scale() -> Vector2:
+	var scale: Vector2 = PlaceholderSquare.window_scale(Vector2(get_window().size), get_viewport().get_visible_rect().size)
+	if scale.x <= 0.0 or scale.y <= 0.0:
+		return Vector2.ONE
+	return scale
+
+
+func _cache_screens() -> void:
+	_usable_rects.clear()
+	_screen_rects.clear()
+	for i: int in DisplayServer.get_screen_count():
+		_usable_rects.append(DisplayServer.screen_get_usable_rect(i))
+		_screen_rects.append(Rect2i(DisplayServer.screen_get_position(i), DisplayServer.screen_get_size(i)))
 
 
 func _on_linger_timeout() -> void:
@@ -156,6 +229,8 @@ func _on_square_rect_changed(_rect: Rect2) -> void:
 
 func _on_drag_started() -> void:
 	_capturing = true
+	_cache_screens()
+	_last_drag_mouse = DisplayServer.mouse_get_position()
 	_linger_timer.stop()
 	_drag_timer.start()
 	set_active(true)
@@ -166,10 +241,18 @@ func _on_drag_ended() -> void:
 	_capturing = false
 	_drag_timer.stop()
 	_linger_timer.start()
+	_on_window_resized()  # границы могли устареть за время drag (экран пропал)
 	_update_passthrough()
 
 
 func _on_drag_timeout() -> void:
+	# курсор двигается без событий (например, над чужим экраном): это не зависание
+	# продлеваем, только пока ОС сообщает зажатую левую кнопку: иначе потерянное отпускание (D-003) оставило бы полный полигон
+	var pressed: bool = (DisplayServer.mouse_get_button_state() & MOUSE_BUTTON_MASK_LEFT) != 0
+	if _capturing and pressed and DisplayServer.mouse_get_position() != _last_drag_mouse:
+		_track_drag(Vector2.ZERO)
+		_drag_timer.start()
+		return
 	_cancel_drag()
 
 
@@ -197,3 +280,18 @@ static func resolve_screen(requested: int, primary: int, count: int) -> int:
 	if requested < 0 or requested >= count:
 		return primary
 	return requested
+
+
+## Чистая функция: индекс первой области, содержащей точку (область сужена на margin со всех сторон),
+## или -1, если точка вне всех (зазор между экранами, меню-бар, Dock). Тогда остаёмся на текущем экране.
+static func screen_at_point(point: Vector2i, rects: Array[Rect2i], margin: int = 0) -> int:
+	for i: int in rects.size():
+		var inner: Rect2i = rects[i].grow(-maxi(margin, 0))
+		if inner.size.x > 0 and inner.size.y > 0 and inner.has_point(point):
+			return i
+	return -1
+
+
+## Чистая функция: лежит ли точка хотя бы в одной области.
+static func point_in_any(point: Vector2i, rects: Array[Rect2i]) -> bool:
+	return screen_at_point(point, rects, 0) >= 0
