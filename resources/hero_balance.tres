@@ -1,0 +1,31 @@
+[gd_resource type="Resource" script_class="HeroBalance" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/hero/hero_balance.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+body_size_px = Vector2(56, 80)
+gravity = 1400.0
+max_fall_speed = 1400.0
+air_drag = 0.4
+wall_restitution = 0.4
+land_friction = 6.0
+walk_speed = 50.0
+idle_pause_min_sec = 15.0
+idle_pause_max_sec = 45.0
+walk_distance_min_px = 40.0
+walk_distance_max_px = 200.0
+walk_stride_px = 24.0
+throw_min_speed = 150.0
+throw_max_speed = 2400.0
+throw_sample_window_sec = 0.1
+hard_landing_speed = 1000.0
+land_soft_sec = 0.15
+land_hard_sec = 0.6
+happy_sec = 2.0
+sulk_sec = 12.0
+sulk_max_sec = 30.0
+contour_step_px = 6.0
+contour_padding_px = 6.0
+max_step_sec = 0.05
+dev_quit_hold_sec = 0.5
