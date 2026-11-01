@@ -13,8 +13,9 @@ extends Resource
 @export var air_drag: float = 0.4
 ## Доля скорости, остающаяся после удара о стену или потолок.
 @export var wall_restitution: float = 0.4
-## Торможение по горизонтали при посадке: доля скорости в секунду.
-@export var land_friction: float = 6.0
+## Торможение по горизонтали при посадке: экспонента exp(-k*t). 20 за land_soft_sec оставляет около 5% скорости:
+## герой не обрывает скольжение на полном ходу при переходе в idle.
+@export var land_friction: float = 20.0
 ## Скорость ходьбы.
 @export var walk_speed: float = 50.0
 ## Пауза между прогулками, минимум и максимум.
@@ -43,6 +44,10 @@ extends Resource
 ## Контур для passthrough: шаг пересчёта и запас вокруг тела.
 @export var contour_step_px: float = 6.0
 @export var contour_padding_px: float = 6.0
+## Запас контура под силуэт сверх тела (x с каждой стороны, y сверху): плащ, наклон, вытяжение.
+## На земле и в воздухе или в руках (там герой наклоняется и вытягивается).
+@export var silhouette_ground_extra_px: Vector2 = Vector2(0.0, 8.0)
+@export var silhouette_air_extra_px: Vector2 = Vector2(28.0, 22.0)
 ## Максимальный шаг логики за кадр.
 @export var max_step_sec: float = 0.05
 ## Удержание правой кнопки для dev-выхода.
@@ -70,6 +75,9 @@ func validation_errors() -> PackedStringArray:
 		errors.append("walk_stride_px, max_step_sec, throw_sample_window_sec must be positive")
 	if contour_step_px <= 0.0:
 		errors.append("contour_step_px must be positive")
+	if silhouette_ground_extra_px.x < 0.0 or silhouette_ground_extra_px.y < 0.0 \
+			or silhouette_air_extra_px.x < 0.0 or silhouette_air_extra_px.y < 0.0:
+		errors.append("silhouette extra must not be negative")
 	if gravity <= 0.0 or walk_speed <= 0.0:
 		errors.append("gravity and walk_speed must be positive")
 	if wall_restitution < 0.0 or wall_restitution > 1.0:

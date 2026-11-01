@@ -6,9 +6,10 @@
 script = ExtResource("1")
 screen_index = -1
 active_fps = 30
+motion_fps = 60
 idle_fps = 8
 low_processor_mode = true
-low_processor_sleep_usec = 33333
+low_processor_sleep_usec = 16666
 screen_check_interval_sec = 2.0
 fit_max_attempts = 3
 active_linger_sec = 0.5

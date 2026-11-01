@@ -22,6 +22,8 @@ var walk_phase: float = 0.0
 var grab_offset: Vector2 = Vector2.ZERO
 ## Скорость последнего удара о пол, читает land.
 var last_impact_speed: float = 0.0
+## Доля прошедшего времени посадки 0..1: читает вид (приседание).
+var land_progress: float = 0.0
 ## Выставляется carried, чтобы root не перехватывал повторный PRESS.
 var carrying: bool = false
 
@@ -42,23 +44,32 @@ func body_rect() -> Rect2:
 	return Rect2(pos.x - size.x * 0.5, pos.y - size.y, size.x, size.y)
 
 
-## Последний опубликованный контур: тело плюс запас. Если ещё не публиковался, считается по телу.
+## Силуэт: тело плюс запас на плащ, наклон и вытяжение. В воздухе и в руках запас больше.
+func silhouette_rect() -> Rect2:
+	var extra: Vector2 = balance.silhouette_ground_extra_px
+	if pose == HeroState.FALL or pose == HeroState.THROWN or pose == HeroState.CARRIED:
+		extra = balance.silhouette_air_extra_px
+	var r: Rect2 = body_rect()
+	return Rect2(r.position.x - extra.x, r.position.y - extra.y, r.size.x + extra.x * 2.0, r.size.y + extra.y)
+
+
+## Последний опубликованный контур: силуэт плюс запас. Если ещё не публиковался, считается по телу.
 func contour_rect() -> Rect2:
 	if _contour_valid:
 		return _contour
-	return body_rect().grow(balance.contour_padding_px)
+	return silhouette_rect().grow(balance.contour_padding_px)
 
 
 ## Публикует новый контур, если герой сдвинулся от прошлого на contour_step_px или force.
-## Инвариант: после вызова тело внутри контура.
+## Инвариант: после вызова силуэт внутри контура.
 func update_contour(force: bool) -> bool:
 	var moved: Vector2 = (pos - _contour_anchor).abs()
 	var need: bool = force or not _contour_valid \
 		or maxf(moved.x, moved.y) >= balance.contour_step_px \
-		or not _contour.encloses(body_rect())
+		or not _contour.encloses(silhouette_rect())
 	if not need:
 		return false
-	_contour = body_rect().grow(balance.contour_padding_px)
+	_contour = silhouette_rect().grow(balance.contour_padding_px)
 	_contour_anchor = pos
 	_contour_valid = true
 	return true

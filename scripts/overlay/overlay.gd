@@ -12,6 +12,8 @@ var _work_area: Rect2i = Rect2i()
 var _active: bool = false
 var _mouse_active: bool = false
 var _hero_active: bool = false
+## Герой в воздухе, в руках или брошен: кадры идут на motion_fps.
+var _hero_moving_fast: bool = false
 var _timer: Timer
 var _linger_timer: Timer
 var _drag_timer: Timer
@@ -49,6 +51,7 @@ func _ready() -> void:
 	add_child(_drag_timer)
 	EventBus.hero_contour_changed.connect(_on_hero_contour_changed)
 	EventBus.hero_activity_changed.connect(_on_hero_activity_changed)
+	EventBus.hero_state_changed.connect(_on_hero_state_changed)
 	EventBus.hero_drag_started.connect(_on_drag_started)
 	EventBus.hero_drag_ended.connect(_on_drag_ended)
 	EventBus.quit_requested.connect(_on_quit_requested)
@@ -152,7 +155,14 @@ func _cancel_drag() -> void:
 
 
 func _apply_fps() -> void:
-	Engine.max_fps = clampi(config.active_fps if _active else config.idle_fps, OverlayConfig.MIN_FPS, OverlayConfig.MAX_FPS)
+	Engine.max_fps = clampi(target_fps(config, _active, _hero_moving_fast), OverlayConfig.MIN_FPS, OverlayConfig.MAX_FPS)
+
+
+## Чистая функция: motion_fps для быстрого движения героя, иначе active_fps или idle_fps. motion_fps не ниже active_fps.
+static func target_fps(cfg: OverlayConfig, active: bool, moving_fast: bool) -> int:
+	if moving_fast:
+		return maxi(cfg.motion_fps, cfg.active_fps)
+	return cfg.active_fps if active else cfg.idle_fps
 
 
 func _input(event: InputEvent) -> void:
@@ -228,6 +238,14 @@ func _on_linger_timeout() -> void:
 func _on_hero_activity_changed(active: bool) -> void:
 	_hero_active = active
 	_refresh_active()
+
+
+func _on_hero_state_changed(_from: StringName, to: StringName) -> void:
+	var fast: bool = to == HeroState.FALL or to == HeroState.THROWN or to == HeroState.CARRIED
+	if fast == _hero_moving_fast:
+		return
+	_hero_moving_fast = fast
+	_apply_fps()
 
 
 func _on_window_resized() -> void:

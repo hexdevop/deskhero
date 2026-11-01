@@ -8,6 +8,9 @@ extends Node2D
 const MICROS_PER_SEC: float = 1000000.0
 ## Нижний предел таймера сна: страховка от нулевого и отрицательного ожидания.
 const MIN_TIMER_SEC: float = 0.01
+## Сглаживание скорости курсора для вида (маятник в руках): постоянная времени, сек. Пропуск слишком близких замеров.
+const CARRY_SMOOTH_TAU_SEC: float = 0.07
+const CARRY_MIN_DT_SEC: float = 0.002
 
 @export var balance: HeroBalance
 ## 0: случайное зерно. Не ноль: детерминированная прогулка (для тестов).
@@ -26,6 +29,9 @@ var _sleep_since_usec: int = 0
 var _activity: int = -1  # -1: ещё не сообщали
 var _pending_drag_end: bool = false
 var _right_down_usec: int = -1
+var _carry_prev_pos: Vector2 = Vector2.ZERO
+var _carry_prev_usec: int = 0
+var _carry_velocity: Vector2 = Vector2.ZERO
 
 @onready var _view: HeroView = $View
 @onready var _timer: Timer = $WakeTimer
@@ -179,12 +185,33 @@ func _after_step(force_contour: bool) -> void:
 	var target: Vector2 = _ctx.pos * units_per_px
 	if position != target:
 		position = target
-	_view.apply(_ctx.pose, _ctx.facing, _ctx.walk_phase, _ctx.emotions.current())
+	_view.apply(_ctx.pose, _ctx.facing, _ctx.walk_phase, _ctx.emotions.current(), _view_motion(),
+			_ctx.land_progress, _ctx.last_impact_speed / balance.hard_landing_speed)
 	_publish_contour(force_contour)
 	_schedule()
 	if _pending_drag_end:
 		_pending_drag_end = false
 		EventBus.hero_drag_ended.emit()  # после контура: полигон Overlay не устарел. Последнее действие: сигнал может вызвать re-entry
+
+
+## Скорость для вида: в руках её задаёт курсор (физика обнуляет velocity), поэтому считается по сдвигу позиции.
+func _view_motion() -> Vector2:
+	if not _ctx.carrying:
+		_carry_velocity = Vector2.ZERO
+		_carry_prev_usec = 0
+		return _ctx.velocity
+	var now: int = Time.get_ticks_usec()
+	if _carry_prev_usec == 0:
+		_carry_prev_pos = _ctx.pos
+		_carry_prev_usec = now
+		return _carry_velocity
+	var dt: float = float(now - _carry_prev_usec) / MICROS_PER_SEC
+	if dt >= CARRY_MIN_DT_SEC:
+		var instant: Vector2 = (_ctx.pos - _carry_prev_pos) / dt
+		_carry_velocity = _carry_velocity.lerp(instant, 1.0 - exp(-dt / CARRY_SMOOTH_TAU_SEC))
+		_carry_prev_pos = _ctx.pos
+		_carry_prev_usec = now
+	return _carry_velocity
 
 
 func _publish_contour(force: bool) -> void:

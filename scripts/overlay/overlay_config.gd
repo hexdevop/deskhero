@@ -10,12 +10,16 @@ const MAX_FPS: int = 240
 @export var screen_index: int = -1
 ## FPS при активности (перетаскивание, движение героя).
 @export_range(5, 120) var active_fps: int = 30
+## FPS, пока герой в воздухе, в руках или брошен (T-117). 30 FPS при броске дают шаги по 20-50 lpx и мерцание.
+## Отступление от SPEC §8: ходьба и покой остаются на active_fps и idle_fps. Ограничивает ещё low_processor_sleep_usec.
+@export_range(5, 120) var motion_fps: int = 60
 ## FPS в покое и во сне.
 @export_range(1, 30) var idle_fps: int = 8
 ## Включать low_processor_mode: кадры рисуются только по событиям или по таймеру.
 @export var low_processor_mode: bool = true
-## Пауза между итерациями главного цикла в low_processor_mode, мкс.
-@export var low_processor_sleep_usec: int = 33333
+## Нижняя граница паузы между итерациями главного цикла в low_processor_mode, мкс. Движок берёт максимум из неё и 1/max_fps,
+## поэтому 33333 запирало бы любой FPS выше 30. 16666 пропускает motion_fps 60, а idle_fps и active_fps ограничивают сами.
+@export var low_processor_sleep_usec: int = 16666
 ## Период проверки смены геометрии экрана, сек. Одна проверка стоит микросекунды.
 @export_range(0.5, 30.0) var screen_check_interval_sec: float = 2.0
 ## Сколько раз подгонять окно под рабочую область, если ОС не даёт точный размер. Потом сдаёмся до смены области.
